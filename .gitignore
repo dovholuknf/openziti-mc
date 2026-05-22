@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+build.claude/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# Loom / Architectury
+.architectury-transformer/
+run/
+runs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

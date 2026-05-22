@@ -1,0 +1,15 @@
+architectury {
+    common("fabric")
+}
+
+dependencies {
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+
+    // Architectury common API
+    modImplementation "dev.architectury:architectury:${rootProject.architectury_api_version}"
+
+    // OpenZiti: pulled into common as compile-only because Architectury common is not
+    // jar-built into a runnable artifact -- the loader modules will Jar-in-Jar these.
+    compileOnly "org.openziti:ziti:${rootProject.ziti_version}"
+    compileOnly "org.openziti:ziti-netty:${rootProject.ziti_version}"
+}
