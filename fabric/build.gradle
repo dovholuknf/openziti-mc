@@ -31,7 +31,8 @@ configurations {
     runtimeClasspath.extendsFrom common
     developmentFabric.extendsFrom common
 
-    // Jar-in-Jar for Ziti SDK so end users do not need to install anything extra.
+    // Bundled into the final production jar via Shadow (handles transitive deps:
+    // Kotlin stdlib, jackson, BouncyCastle, etc).
     shadowBundle {
         canBeResolved = true
         canBeConsumed = false
@@ -46,7 +47,11 @@ dependencies {
     common(project(path: ":common", configuration: "namedElements")) { transitive false }
     shadowBundle project(path: ":common", configuration: "transformProductionFabric")
 
-    // Bundle OpenZiti via shadow
+    // OpenZiti SDK + Netty integration.
+    // `implementation` puts them on the dev-runtime classpath (so :fabric:runClient works).
+    // `shadowBundle` packages them (with transitives) into the production jar.
+    implementation "org.openziti:ziti:${rootProject.ziti_version}"
+    implementation "org.openziti:ziti-netty:${rootProject.ziti_version}"
     shadowBundle "org.openziti:ziti:${rootProject.ziti_version}"
     shadowBundle "org.openziti:ziti-netty:${rootProject.ziti_version}"
 }

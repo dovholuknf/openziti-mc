@@ -4,11 +4,11 @@
   "compatibilityLevel": "JAVA_17",
   "minVersion": "0.8",
   "mixins": [
-    "ServerAddressMixin",
     "ServerConnectionListenerMixin"
   ],
   "client": [
-    "ConnectionMixin"
+    "ConnectionMixin",
+    "ServerNameResolverMixin"
   ],
   "injectors": {
     "defaultRequire": 1

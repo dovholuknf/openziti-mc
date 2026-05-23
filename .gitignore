@@ -25,8 +25,12 @@ bin/
 # Loom / Architectury
 .architectury-transformer/
 run/
+run-server/
 runs/
 *.log
+
+# Local-only Claude Code permissions
+.claude/settings.local.json
 
 # OS
 .DS_Store
