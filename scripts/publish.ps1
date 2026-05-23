@@ -179,12 +179,9 @@ if ($ModrinthToken) {
         Write-Host "  -> https://modrinth.com/mod/$ModrinthProjectId/version/$($resp.version_number)"
     }
     catch {
-        $errBody = ""
-        if ($_.Exception.Response) {
-            $stream = $_.Exception.Response.GetResponseStream()
-            $reader = New-Object System.IO.StreamReader($stream)
-            $errBody = $reader.ReadToEnd()
-        }
+        # PS 7+: response body lives on ErrorDetails.Message
+        # PS 5.1: also has ErrorDetails.Message for Invoke-RestMethod failures
+        $errBody = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { "" }
         throw "Modrinth upload failed: $($_.Exception.Message)`n$errBody"
     }
 }
