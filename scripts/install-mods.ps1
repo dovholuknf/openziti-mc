@@ -226,26 +226,42 @@ if ($toDownload.Count -gt 0) {
 # -- Optional identity copy --------------------------------------------------
 
 Write-Banner "OpenZiti identity"
+
 if (-not $IdentityFile -and -not $NonInteractive) {
-    Write-Host "Optional: drop your enrolled OpenZiti identity .json file in place now."
-    Write-Host "Paste the full path to the .json (or press Enter to skip and do it manually later)."
-    $IdentityFile = Read-Host "Identity .json path"
+    $hasIdentity = Read-Host "Do you have an enrolled OpenZiti identity .json file ready? [y/N]"
+    if ($hasIdentity -match '^[Yy]') {
+        while (-not $IdentityFile) {
+            $candidate = Read-Host "Full path to the identity .json (blank to skip)"
+            if (-not $candidate) {
+                Write-Host "  Skipping identity placement." -ForegroundColor Yellow
+                break
+            }
+            # Strip surrounding quotes some users paste from Explorer's "Copy as path".
+            $candidate = $candidate.Trim('"').Trim("'")
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                $IdentityFile = $candidate
+            } else {
+                Write-Host "  File not found at: $candidate" -ForegroundColor Red
+                Write-Host "  Try again or press Enter to skip."
+            }
+        }
+    }
 }
 
 if ($IdentityFile) {
-    if (-not (Test-Path $IdentityFile)) {
+    if (-not (Test-Path -LiteralPath $IdentityFile -PathType Leaf)) {
         Write-Host "  Identity file not found at: $IdentityFile" -ForegroundColor Red
-        Write-Host "  Skipping; copy it manually to:" -ForegroundColor Yellow
+        Write-Host "  Copy it manually to:" -ForegroundColor Yellow
         Write-Host "    $ConfigDir\openziti\identity.json"
     } else {
         $destDir  = Join-Path $ConfigDir "openziti"
         $destFile = Join-Path $destDir "identity.json"
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        Copy-Item -Path $IdentityFile -Destination $destFile -Force
+        Copy-Item -LiteralPath $IdentityFile -Destination $destFile -Force
         Write-Host "  Identity placed at: $destFile" -ForegroundColor Green
     }
 } else {
-    Write-Host "  Skipped. Place your enrolled identity at:"
+    Write-Host "  Skipped. When you have one, copy it to:" -ForegroundColor Yellow
     Write-Host "    $ConfigDir\openziti\identity.json"
 }
 
