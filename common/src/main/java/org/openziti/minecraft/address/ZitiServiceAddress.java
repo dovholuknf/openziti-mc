@@ -8,29 +8,18 @@ public final class ZitiServiceAddress {
 
     /**
      * Decide whether a "Server Address" field input should be treated as a Ziti
-     * service name rather than a TCP host. v1 heuristic:
-     *
-     * 1. If {@code addressDetection == "prefix"}, only inputs starting with {@code ziti:}
-     *    are Ziti services.
-     * 2. Otherwise ({@code "implicit"}), an input with no dot and no colon and no port
-     *    is treated as a Ziti service. Numeric-only inputs are never Ziti.
+     * service name rather than a TCP host. Rule: when the mod is enabled, an input
+     * with no dot and no colon and no all-digit characters is treated as a Ziti
+     * service. Numeric-only inputs are never Ziti. Anything containing {@code .} or
+     * {@code :} (IPs, host:port, etc) is never Ziti.
      */
     public static boolean isZitiServiceName(String input) {
+        // Client dial is always active when the mod is installed. The serverEnabled
+        // toggle only governs the server-side bind, not whether we recognize service
+        // names in the "Add Server" address field.
         if (input == null || input.isBlank()) return false;
-        String mode = ZitiMc.config().addressDetection;
-        if ("prefix".equalsIgnoreCase(mode)) {
-            return input.startsWith("ziti:");
-        }
         if (input.contains(".") || input.contains(":")) return false;
         if (input.chars().allMatch(Character::isDigit)) return false;
         return true;
-    }
-
-    /** Strip a {@code ziti:} prefix if present. */
-    public static String normalize(String input) {
-        if (input != null && input.startsWith("ziti:")) {
-            return input.substring("ziti:".length());
-        }
-        return input;
     }
 }

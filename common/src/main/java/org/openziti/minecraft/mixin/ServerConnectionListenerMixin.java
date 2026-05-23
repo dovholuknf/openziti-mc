@@ -20,16 +20,18 @@ import java.net.InetAddress;
 import java.util.List;
 
 /**
- * Hooks the dedicated/integrated server's TCP listener so we additionally bind on
- * a Ziti service when {@code serverBind.enabled} is true in the config.
+ * Hooks the dedicated/integrated server's TCP listener and, when the mod is enabled,
+ * binds on a Ziti service instead.
  *
- * <p>Modeled after e4mc's ServerConnectionListenerMixin: capture the
+ * <p>The same method runs for both a dedicated server (always) and a client's
+ * integrated server when the player clicks Open to LAN. Either way we capture the
  * {@link EventLoopGroup} and child {@link ChannelHandler} that vanilla passes to its
- * {@link ServerBootstrap}, then at the TAIL of {@code startTcpServerListener} stand up
- * a second {@link ServerBootstrap} that uses {@link ZitiServerChannelFactory} and binds
- * to a {@link ZitiAddress.Bind}. The resulting {@link ChannelFuture} is added to
- * vanilla's own {@code channels} list so {@link ServerConnectionListener#stop()} closes
- * it for us.
+ * {@link ServerBootstrap}, then at the TAIL of {@code startTcpServerListener} stand
+ * up a second {@link ServerBootstrap} that uses {@link ZitiServerChannelFactory} and
+ * binds to a {@link ZitiAddress.Bind}. The resulting {@link ChannelFuture} is added
+ * to vanilla's own {@code channels} list so {@link ServerConnectionListener#stop()}
+ * closes it for us. The vanilla TCP listener is closed right after the Ziti listener
+ * binds, so the server is reachable on the overlay only -- zero-trust posture.
  */
 @Mixin(ServerConnectionListener.class)
 public abstract class ServerConnectionListenerMixin {
@@ -74,12 +76,12 @@ public abstract class ServerConnectionListenerMixin {
     @Inject(method = "startTcpServerListener", at = @At("TAIL"))
     private void zitimc$bindZitiListener(InetAddress address, int port, CallbackInfo ci) {
         try {
-            if (!ZitiMc.config().serverBind.enabled) {
+            if (!ZitiMc.config().serverEnabled) {
                 return;
             }
-            String service = ZitiMc.config().serverBind.serviceName;
+            String service = ZitiMc.config().serviceName;
             if (service == null || service.isEmpty()) {
-                ZitiMc.LOG.warn("serverBind.enabled=true but serverBind.serviceName is empty; not binding Ziti listener");
+                ZitiMc.LOG.warn("OpenZiti server is enabled but serviceName is empty; not binding Ziti listener");
                 return;
             }
             ChannelHandler childHandler = this.zitimc$childHandler;
@@ -98,17 +100,17 @@ public abstract class ServerConnectionListenerMixin {
             this.channels.add(zitiFuture);
             ZitiMc.LOG.info("Ziti listener bound on service '{}'", service);
 
-            if (ZitiMc.config().serverBind.disableTcp) {
-                ZitiMc.LOG.info("Closing vanilla TCP listener(s) (serverBind.disableTcp=true)");
-                for (int i = this.channels.size() - 1; i >= 0; i--) {
-                    ChannelFuture cf = this.channels.get(i);
-                    if (cf == zitiFuture) continue;
-                    try {
-                        cf.channel().close().syncUninterruptibly();
-                        this.channels.remove(i);
-                    } catch (Throwable t) {
-                        ZitiMc.LOG.warn("Failed to close TCP listener channel", t);
-                    }
+            // Always close vanilla's TCP listener when the mod is enabled. The mod is
+            // either on (Ziti-only, zero-trust) or off (vanilla TCP). No dual-listener.
+            ZitiMc.LOG.info("Closing vanilla TCP listener(s) -- Ziti-only mode");
+            for (int i = this.channels.size() - 1; i >= 0; i--) {
+                ChannelFuture cf = this.channels.get(i);
+                if (cf == zitiFuture) continue;
+                try {
+                    cf.channel().close().syncUninterruptibly();
+                    this.channels.remove(i);
+                } catch (Throwable t) {
+                    ZitiMc.LOG.warn("Failed to close TCP listener channel", t);
                 }
             }
         } catch (Throwable t) {

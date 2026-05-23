@@ -13,6 +13,7 @@
     "issues": "https://github.com/dovholuknf/openziti-mc/issues"
   },
   "license": "Apache-2.0",
+  "icon": "assets/openziti/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
@@ -20,6 +21,9 @@
     ],
     "client": [
       "org.openziti.minecraft.fabric.ZitiMcFabricClient"
+    ],
+    "modmenu": [
+      "org.openziti.minecraft.fabric.ZitiMcModMenu"
     ]
   },
   "mixins": [
@@ -29,7 +33,11 @@
     "fabricloader": ">=0.16.10",
     "fabric-api": "*",
     "architectury": ">=9.0.0",
+    "cloth-config": ">=11.0.0",
     "minecraft": "~${minecraft_version}",
     "java": ">=${java_version}"
+  },
+  "recommends": {
+    "modmenu": ">=7.0.0"
   }
 }

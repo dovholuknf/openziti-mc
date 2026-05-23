@@ -1,0 +1,20 @@
+{
+  "text.autoconfig.openziti.title": "OpenZiti MC",
+
+  "text.autoconfig.openziti.category.openziti": "OpenZiti",
+  "text.autoconfig.openziti.category.zrok": "zrok",
+
+  "text.autoconfig.openziti.option.identityPath": "Identity file",
+  "text.autoconfig.openziti.option.identityPath.@Tooltip": "Path to your enrolled OpenZiti identity .json.",
+
+  "text.autoconfig.openziti.option.serverEnabled": "OpenZiti server enabled",
+  "text.autoconfig.openziti.option.serverEnabled.@Tooltip": "Host your server over OpenZiti. Off = client-only (you can still join others).",
+  "text.autoconfig.openziti.option.serverEnabled.@PrefixText": "Server (only needed if you host)",
+
+  "text.autoconfig.openziti.option.serviceName": "Service name",
+  "text.autoconfig.openziti.option.serviceName.@Tooltip": "Service to bind on. Used only when the server is enabled above.",
+
+  "text.autoconfig.openziti.option.zrokShareToken": "Share token",
+  "text.autoconfig.openziti.option.zrokShareToken.@Tooltip": "Not yet wired. zrok backend ships in v0.3.0.",
+  "text.autoconfig.openziti.option.zrokShareToken.@PrefixText": "zrok support is a placeholder. Backend lands in v0.3.0; setting this today does nothing."
+}

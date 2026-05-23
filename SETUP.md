@@ -108,28 +108,38 @@ New-Item -ItemType Directory -Force -Path .\run-server\config\openziti
 Move-Item .\server-mc.json .\run-server\config\openziti\identity.json
 ```
 
-## 6. Enable the server-side bind
+## 6. Configure the mod
 
-The mod ships server-bind disabled by default so client-only installs do not spin up a
-Ziti listener they do not need. Turn it on for the server:
+Open the in-game **Mods -> OpenZiti MC -> Configure** screen (ModMenu). Two tabs:
+**OpenZiti** (the working backend) and **zrok** (placeholder for v0.3.0).
 
-```powershell
-# Either edit run-server\config\openziti.json by hand, or:
-notepad .\run-server\config\openziti.json
-```
+The OpenZiti tab has three fields:
 
-Set the contents to:
+- **Identity file** -- path to your enrolled identity .json, relative to the Minecraft
+  instance directory. Default `config/openziti/identity.json`.
+- **OpenZiti server enabled** -- opt-in for hosting. Off by default because most users
+  are client-only. When on: your dedicated/integrated server binds on the OpenZiti
+  service in place of its TCP listener (zero-trust). When off: this MC install is
+  client-only -- you can still dial *other* peoples' Ziti services in Add Server, you
+  just won't host one yourself.
+- **Service name** -- the OpenZiti service to bind on. Used only when **OpenZiti
+  server enabled** is on.
+
+Equivalent JSON in `config/openziti.json`:
 
 ```json
 {
   "identityPath": "config/openziti/identity.json",
-  "addressDetection": "implicit",
-  "serverBind": { "enabled": true, "serviceName": "openziti-mc" }
+  "serverEnabled": true,
+  "serviceName": "openziti-mc",
+  "zrokShareToken": ""
 }
 ```
 
-The client-side file at `run/config/openziti.json` stays as the defaults (the client
-does not need `serverBind` enabled).
+Both the client install and the server install use the same schema. The only
+substantive difference is the identity file on each side and whether
+**serverEnabled** is on (off on a pure-client install, on for a host). All fields
+require a restart; Cloth Config prompts for one automatically after Save.
 
 ## 7. Dev-only: turn off Mojang auth on the server
 
@@ -185,6 +195,23 @@ Expected log lines on the client:
 You are now playing Minecraft over an OpenZiti overlay. No port forwarding, no public
 TCP listener, identity-authenticated by the controller.
 
+## Bonus: host from a client via Open to LAN
+
+You do **not** need a dedicated server jar. Every Minecraft Java client has the
+dedicated-server code built in -- it's how "Open to LAN" works. With this mod:
+
+1. Friend A (the host) launches MC with the mod, loads a single-player world, and
+   clicks **Open to LAN** in the pause menu.
+2. With **OpenZiti server enabled** on and **Service name** set, the integrated
+   server binds on the OpenZiti service the same way a dedicated server would.
+   Friend A's machine never exposes a TCP port and never needs a public IP.
+3. Friend B (the joiner) launches MC with the mod, opens **Multiplayer -> Add
+   Server**, types the service name, and joins.
+
+Friend A's identity needs Bind permission on the service (the `#minecraft-server`
+attribute from step 1). Friend B's identity needs Dial permission
+(`#minecraft-clients`). Same controller setup, no dedicated server required.
+
 ## Troubleshooting
 
 | Symptom                                                          | Cause                                                                                                   | Fix                                                                                          |
@@ -194,6 +221,37 @@ TCP listener, identity-authenticated by the controller.
 | `lost connection: Disconnected` immediately after Login Start    | `online-mode=true` on the server, dev client is offline                                                 | Set `online-mode=false` for dev (see step 7)                                                  |
 | `ClassNotFoundException: org.openziti.netty.ZitiChannelFactory` at startup | Mod jar is missing the bundled Ziti SDK                                                            | Rebuild with `./gradlew :fabric:build`; production jar is at `fabric/build/libs/openziti-fabric-*.jar` |
 | Mod's `init` logs no identity path                               | `config/openziti.json` missing or unreadable                                                            | The mod writes defaults on first launch; check working dir matches the run task (`run/` vs `run-server/`) |
+| Server log shows `Closing vanilla TCP listener(s)`               | Expected behavior when **OpenZiti server enabled** is on                                                | This is the zero-trust posture. To get the TCP listener back, turn the toggle off.            |
+
+## Finding the logs
+
+When Minecraft is launched via `:fabric:runClient`/`runServer`, log output streams to
+the gradle window. When launched via a real launcher (official Mojang launcher,
+Modrinth App, Prism, MultiMC, etc.), Log4j2 writes to a file under the instance
+directory:
+
+| Launcher / target          | Path                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| Official launcher (Win)    | `%APPDATA%\.minecraft\logs\latest.log` (`C:\Users\<you>\AppData\Roaming\...`)         |
+| Official launcher (macOS)  | `~/Library/Application Support/minecraft/logs/latest.log`                             |
+| Official launcher (Linux)  | `~/.minecraft/logs/latest.log`                                                        |
+| Modrinth App               | `%APPDATA%\com.modrinth.theseus\profiles\<name>\logs\latest.log` (or platform equiv) |
+| Prism / MultiMC / ATLauncher | `<launcher-instance-dir>/.minecraft/logs/latest.log`                                |
+| Dedicated server           | `<server-dir>/logs/latest.log`                                                       |
+
+Older logs rotate to `logs/<yyyy-mm-dd>-N.log.gz` in the same folder.
+
+To tail the log live from PowerShell while playing:
+
+```powershell
+Get-Content -Wait "$env:APPDATA\.minecraft\logs\latest.log"
+```
+
+Filter to just the mod's lines:
+
+```powershell
+Get-Content -Wait "$env:APPDATA\.minecraft\logs\latest.log" | Where-Object { $_ -match 'ziti-minecraft' }
+```
 
 ## Reference
 

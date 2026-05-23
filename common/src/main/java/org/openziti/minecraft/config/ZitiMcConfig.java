@@ -1,41 +1,47 @@
 package org.openziti.minecraft.config;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.openziti.minecraft.ZitiMc;
+import me.shedaniel.autoconfig.ConfigData;
+import me.shedaniel.autoconfig.annotation.Config;
+import me.shedaniel.autoconfig.annotation.ConfigEntry;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+/**
+ * Cloth Config schema. The annotations drive the auto-generated in-game settings
+ * screen reached from ModMenu. AutoConfig handles load/save via Gson; the config file
+ * lives at {@code config/openziti.json}.
+ *
+ * <p>Each field is tagged with a {@code @ConfigEntry.Category} so the screen renders
+ * two tabs across the top: <strong>OpenZiti</strong> (today's working backend) and
+ * <strong>zrok</strong> (placeholder for v0.3.0).
+ *
+ * <p>The client-side dial path is always active once the mod is installed. Only the
+ * server-side bind is opt-in via {@link #serverEnabled}, because most users are
+ * client-only and should not have to think about it.
+ */
+@Config(name = "openziti")
+public final class ZitiMcConfig implements ConfigData {
 
-public final class ZitiMcConfig {
+    // -- OpenZiti tab ----------------------------------------------------
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-
+    @ConfigEntry.Category("openziti")
+    @ConfigEntry.Gui.Tooltip
+    @ConfigEntry.Gui.RequiresRestart
     public String identityPath = "config/openziti/identity.json";
-    public String addressDetection = "implicit"; // "implicit" | "prefix"
-    public ServerBind serverBind = new ServerBind();
 
-    public static final class ServerBind {
-        public boolean enabled = false;
-        public String serviceName = "";
-        /** When true and {@link #enabled} is true, the vanilla TCP listener is closed
-         *  right after the Ziti listener binds. Zero-trust posture -- nothing on 25565. */
-        public boolean disableTcp = false;
-    }
+    @ConfigEntry.Category("openziti")
+    @ConfigEntry.Gui.PrefixText
+    @ConfigEntry.Gui.Tooltip
+    @ConfigEntry.Gui.RequiresRestart
+    public boolean serverEnabled = false;
 
-    public static ZitiMcConfig loadOrCreate(Path file) {
-        try {
-            if (!Files.exists(file)) {
-                Files.createDirectories(file.getParent());
-                ZitiMcConfig defaults = new ZitiMcConfig();
-                Files.writeString(file, GSON.toJson(defaults));
-                return defaults;
-            }
-            return GSON.fromJson(Files.readString(file), ZitiMcConfig.class);
-        } catch (IOException ioe) {
-            ZitiMc.LOG.error("Failed to load {} -- using defaults", file, ioe);
-            return new ZitiMcConfig();
-        }
-    }
+    @ConfigEntry.Category("openziti")
+    @ConfigEntry.Gui.Tooltip
+    @ConfigEntry.Gui.RequiresRestart
+    public String serviceName = "openziti-mc";
+
+    // -- zrok tab (placeholder; backend lands in v0.3.0) -----------------
+
+    @ConfigEntry.Category("zrok")
+    @ConfigEntry.Gui.PrefixText
+    @ConfigEntry.Gui.Tooltip
+    public String zrokShareToken = "";
 }

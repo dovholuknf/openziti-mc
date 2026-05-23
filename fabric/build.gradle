@@ -54,6 +54,11 @@ dependencies {
     implementation "org.openziti:ziti-netty:${rootProject.ziti_version}"
     shadowBundle "org.openziti:ziti:${rootProject.ziti_version}"
     shadowBundle "org.openziti:ziti-netty:${rootProject.ziti_version}"
+
+    // In-game settings UI: Cloth Config builds the screen from our @Config schema,
+    // ModMenu surfaces a "Configure" button in the in-game Mods list.
+    modImplementation "me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_config_version}"
+    modImplementation "com.terraformersmc:modmenu:${rootProject.modmenu_version}"
 }
 
 shadowJar {

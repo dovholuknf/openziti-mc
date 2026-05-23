@@ -28,9 +28,8 @@ public abstract class ServerNameResolverMixin {
     private void zitimc$resolveAsZitiService(
             ServerAddress address,
             CallbackInfoReturnable<Optional<ResolvedServerAddress>> cir) {
-        String host = address.getHost();
-        if (!ZitiServiceAddress.isZitiServiceName(host)) return;
-        String service = ZitiServiceAddress.normalize(host);
+        String service = address.getHost();
+        if (!ZitiServiceAddress.isZitiServiceName(service)) return;
         ZitiMc.LOG.info("Resolving '{}' as Ziti service", service);
         cir.setReturnValue(Optional.of(new ResolvedServerAddress() {
             @Override public String getHostName() { return service; }

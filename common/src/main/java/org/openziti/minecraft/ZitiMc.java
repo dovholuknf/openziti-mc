@@ -1,5 +1,8 @@
 package org.openziti.minecraft;
 
+import me.shedaniel.autoconfig.AutoConfig;
+import me.shedaniel.autoconfig.ConfigHolder;
+import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 import org.openziti.ZitiContext;
 import org.openziti.minecraft.config.ZitiMcConfig;
 import org.openziti.minecraft.identity.FileIdentityProvider;
@@ -8,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
@@ -19,21 +21,21 @@ public final class ZitiMc {
     /** How long to wait for the Ziti context to reach Active on first load. */
     private static final long WARMUP_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(15);
 
-    private static ZitiMcConfig CONFIG;
+    private static ConfigHolder<ZitiMcConfig> CONFIG_HOLDER;
     private static IdentityProvider IDENTITY;
     private static volatile ZitiContext ZITI_CONTEXT;
 
     private ZitiMc() {}
 
     public static void init() {
-        Path configDir = Paths.get("config");
-        CONFIG = ZitiMcConfig.loadOrCreate(configDir.resolve(MOD_ID + ".json"));
-        IDENTITY = new FileIdentityProvider(Paths.get(CONFIG.identityPath));
+        CONFIG_HOLDER = AutoConfig.register(ZitiMcConfig.class, GsonConfigSerializer::new);
+        ZitiMcConfig cfg = CONFIG_HOLDER.getConfig();
+        IDENTITY = new FileIdentityProvider(Paths.get(cfg.identityPath));
         LOG.info("ziti-minecraft init: identity provider = {}", IDENTITY.describe());
     }
 
     public static ZitiMcConfig config() {
-        return CONFIG;
+        return CONFIG_HOLDER.getConfig();
     }
 
     public static IdentityProvider identity() {
