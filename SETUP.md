@@ -1,0 +1,213 @@
+# ziti-minecraft -- Setup Guide
+
+End-to-end recipe for joining a Minecraft server over OpenZiti instead of TCP. Everything
+below is what the working v1 dev environment uses; commands are PowerShell-flavored and
+match the exact controller objects exported from a known-good install (see
+`minecraft.export.json` in this repo).
+
+## Prerequisites
+
+1. **A running OpenZiti controller** (any version v0.x or v1.x). Public endpoint reachable
+   from both the player's machine and the server's machine.
+2. **At least one edge router** registered with the controller, with the
+   `public` attribute. Router does not need to be on the public internet -- only reachable
+   from the controller's network plus the two endpoints.
+3. **`ziti` CLI** on your admin workstation, logged into the controller
+   (`ziti edge login <controller>:1280 -u admin -p <pw>`).
+4. **Java 17** (Temurin) and Minecraft 1.20.1.
+5. The mod jar from `fabric/build/libs/openziti-fabric-<version>.jar` on both client and
+   server.
+
+If you do not have a controller yet, the fastest path is
+`ziti edge quickstart` (single binary, all-in-one for dev).
+
+## 1. Create identities
+
+Two identities. One **binds** the service (your dedicated server). One **dials** the
+service (your player). The identity files are downloaded as JWT enrollment tokens that
+get converted to long-lived `.json` identities in step 4.
+
+Tag each identity with a role attribute so the service policies in step 3 grant access
+by **attribute** rather than by specific identity name. That way adding a second
+player later is just `ziti edge create identity player2 --role-attributes minecraft-clients`
+with no policy edits.
+
+```powershell
+# The dedicated server's identity, tagged for the bind policy
+ziti edge create identity server-mc --role-attributes minecraft-server -o server-mc.jwt
+# The player's identity, tagged for the dial policy
+ziti edge create identity client-mc --role-attributes minecraft-clients -o client-mc.jwt
+```
+
+Two `.jwt` files now sit in your current directory. They are single-use enrollment
+tokens; copy them to the machine where each identity will run before enrolling.
+
+## 2. Create the service
+
+```powershell
+# A bare service. No address configs needed -- the mod dials and binds by service name
+# directly, not via an intercept/host config.
+ziti edge create service openziti-mc
+```
+
+Defaults that matter:
+- `terminatorStrategy: smartrouting` -- the router picks the best terminator if there
+  are several (good for failover; for one binder it makes no difference).
+- `encryptionRequired: true` -- end-to-end Ziti payload encryption on top of the edge
+  router's TLS. Leave it on.
+
+## 3. Authorize the identities
+
+Three policies. Two on the service (bind + dial), one for edge-router access. Policies
+match identities by **role attribute** (`#minecraft-server`, `#minecraft-clients`)
+rather than by specific name. Anything tagged with the right attribute is in scope.
+
+```powershell
+# Anything tagged #minecraft-server can BIND openziti-mc (run a listener)
+ziti edge create service-policy mc-bind Bind `
+    --service-roles '@openziti-mc' --identity-roles '#minecraft-server'
+# Anything tagged #minecraft-clients can DIAL openziti-mc (connect to a listener)
+ziti edge create service-policy mc-dial Dial `
+    --service-roles '@openziti-mc' --identity-roles '#minecraft-clients'
+# Both tag sets can reach the public-attributed edge routers
+ziti edge create edge-router-policy mc-erp `
+    --edge-router-roles '#public' --identity-roles '#minecraft-server,#minecraft-clients'
+# openziti-mc is reachable via public-attributed edge routers
+ziti edge create service-edge-router-policy mc-serp `
+    --service-roles '@openziti-mc' --edge-router-roles '#public'
+```
+
+If your controller already has wildcard policies for `#all` identities on `#public`
+routers (the `ziti edge quickstart` setup does), `mc-erp` and `mc-serp` are redundant
+but harmless. Keeping them explicit makes the setup self-contained.
+
+## 4. Enroll the identities
+
+Convert each `.jwt` (single-use) into a `.json` (long-lived):
+
+```powershell
+ziti edge enroll --jwt server-mc.jwt -o server-mc.json
+ziti edge enroll --jwt client-mc.jwt -o client-mc.json
+```
+
+The `.jwt` files are consumed; keep the `.json` files safe. Each one carries a unique
+private key that authenticates as that identity.
+
+## 5. Drop the identities into the mod's config dirs
+
+For dev runs via `./gradlew :fabric:runClient` and `:fabric:runServer`, working dirs are
+`run/` and `run-server/` respectively. For a real Minecraft instance, replace those with
+your launcher's instance directory.
+
+```powershell
+# Client side -- where the player runs MC
+New-Item -ItemType Directory -Force -Path .\run\config\openziti
+Move-Item .\client-mc.json .\run\config\openziti\identity.json
+# Server side -- where the dedicated server runs
+New-Item -ItemType Directory -Force -Path .\run-server\config\openziti
+Move-Item .\server-mc.json .\run-server\config\openziti\identity.json
+```
+
+## 6. Enable the server-side bind
+
+The mod ships server-bind disabled by default so client-only installs do not spin up a
+Ziti listener they do not need. Turn it on for the server:
+
+```powershell
+# Either edit run-server\config\openziti.json by hand, or:
+notepad .\run-server\config\openziti.json
+```
+
+Set the contents to:
+
+```json
+{
+  "identityPath": "config/openziti/identity.json",
+  "addressDetection": "implicit",
+  "serverBind": { "enabled": true, "serviceName": "openziti-mc" }
+}
+```
+
+The client-side file at `run/config/openziti.json` stays as the defaults (the client
+does not need `serverBind` enabled).
+
+## 7. Dev-only: turn off Mojang auth on the server
+
+The `:fabric:runClient` task uses an offline `Player###` profile. Vanilla
+`server.properties` defaults to `online-mode=true`, which tries to verify that player
+with Mojang and boots them. For dev testing:
+
+```powershell
+(Get-Content .\run-server\server.properties) -replace '^online-mode=true','online-mode=false' | Set-Content -Encoding UTF8 .\run-server\server.properties
+```
+
+Production deployments behind Ziti should usually leave `online-mode=true` so real
+Mojang-auth still applies on top of overlay identity-auth.
+
+Also accept the Mojang EULA:
+
+```powershell
+"eula=true" | Set-Content -Encoding UTF8 .\run-server\eula.txt
+```
+
+## 8. Run
+
+```powershell
+# Window 1: dedicated server
+./gradlew :fabric:runServer
+```
+
+Wait for these log lines:
+```
+[ziti-minecraft] ziti-minecraft init: identity provider = file:config\openziti\identity.json
+[ziti-minecraft] Binding Minecraft server to Ziti service 'openziti-mc'
+[ziti-minecraft] Ziti listener bound on service 'openziti-mc'
+... Done (Xs)!
+```
+
+Then in a second window:
+
+```powershell
+# Window 2: dev client
+./gradlew :fabric:runClient
+```
+
+In Minecraft: **Multiplayer -> Add Server**. Server Address: `openziti-mc`. Done.
+Click **Join Server**.
+
+Expected log lines on the client:
+```
+[ziti-minecraft] Resolving 'openziti-mc' as Ziti service
+[ziti-minecraft] Dialing Ziti service openziti-mc
+... Loaded N advancements
+```
+
+You are now playing Minecraft over an OpenZiti overlay. No port forwarding, no public
+TCP listener, identity-authenticated by the controller.
+
+## Troubleshooting
+
+| Symptom                                                          | Cause                                                                                                   | Fix                                                                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Client logs `ServiceNotAvailable`                                | First dial races the SDK's catalog sync                                                                 | Already handled by the mod's catalog-wait + 5-retry loop. If persistent, check service policies. |
+| Client logs `exceeded maximum [2] retries creating circuit`      | Edge router cannot reach the binder. Either binder is down, or no `mc-erp` / `mc-serp` policies         | Verify `ziti edge list terminators` shows your service, server log shows `Ziti listener bound` |
+| `lost connection: Disconnected` immediately after Login Start    | `online-mode=true` on the server, dev client is offline                                                 | Set `online-mode=false` for dev (see step 7)                                                  |
+| `ClassNotFoundException: org.openziti.netty.ZitiChannelFactory` at startup | Mod jar is missing the bundled Ziti SDK                                                            | Rebuild with `./gradlew :fabric:build`; production jar is at `fabric/build/libs/openziti-fabric-*.jar` |
+| Mod's `init` logs no identity path                               | `config/openziti.json` missing or unreadable                                                            | The mod writes defaults on first launch; check working dir matches the run task (`run/` vs `run-server/`) |
+
+## Reference
+
+[`setup-ziti.ps1`](setup-ziti.ps1) in this repo is the entire controller-side setup as
+runnable commands. Identities, service, policies, edge-router policies, enrollment --
+all of step 1 through step 4 above in one file. Run it whole, or open it and copy out
+the parts you want. The same commands work in bash; only the shell prompt differs.
+
+If you want to dump the full state of your own working controller for diff/audit:
+
+```powershell
+ziti ops export | Out-File mine.export.json
+```
+
+That produces a much larger file with every controller object plus environment
+details (router hostnames, MAC addresses, interface inventories). Sanitize before
+sharing publicly.

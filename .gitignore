@@ -32,6 +32,11 @@ runs/
 # Local-only Claude Code permissions
 .claude/settings.local.json
 
+# Ziti enrollment artifacts and enrolled identities -- private keys, never commit
+*.jwt
+client-mc.json
+server-mc.json
+
 # OS
 .DS_Store
 Thumbs.db

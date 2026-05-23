@@ -94,9 +94,23 @@ public abstract class ServerConnectionListenerMixin {
             bootstrap.channelFactory(new ZitiServerChannelFactory(ZitiMc.zitiContext()));
             bootstrap.childHandler(childHandler);
             bootstrap.group(group);
-            ChannelFuture future = bootstrap.bind(new ZitiAddress.Bind(service)).syncUninterruptibly();
-            this.channels.add(future);
+            ChannelFuture zitiFuture = bootstrap.bind(new ZitiAddress.Bind(service)).syncUninterruptibly();
+            this.channels.add(zitiFuture);
             ZitiMc.LOG.info("Ziti listener bound on service '{}'", service);
+
+            if (ZitiMc.config().serverBind.disableTcp) {
+                ZitiMc.LOG.info("Closing vanilla TCP listener(s) (serverBind.disableTcp=true)");
+                for (int i = this.channels.size() - 1; i >= 0; i--) {
+                    ChannelFuture cf = this.channels.get(i);
+                    if (cf == zitiFuture) continue;
+                    try {
+                        cf.channel().close().syncUninterruptibly();
+                        this.channels.remove(i);
+                    } catch (Throwable t) {
+                        ZitiMc.LOG.warn("Failed to close TCP listener channel", t);
+                    }
+                }
+            }
         } catch (Throwable t) {
             ZitiMc.LOG.error("Failed to bind Ziti listener", t);
         } finally {

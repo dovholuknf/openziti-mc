@@ -19,6 +19,9 @@ public final class ZitiMcConfig {
     public static final class ServerBind {
         public boolean enabled = false;
         public String serviceName = "";
+        /** When true and {@link #enabled} is true, the vanilla TCP listener is closed
+         *  right after the Ziti listener binds. Zero-trust posture -- nothing on 25565. */
+        public boolean disableTcp = false;
     }
 
     public static ZitiMcConfig loadOrCreate(Path file) {
