@@ -96,21 +96,6 @@ if (-not (Test-Path $ModsDir)) {
     New-Item -ItemType Directory -Path $ModsDir -Force | Out-Null
 }
 
-# Warn about existing jars.
-$existing = Get-ChildItem -Path $ModsDir -Filter "*.jar" -ErrorAction SilentlyContinue
-if ($existing.Count -gt 0) {
-    Write-Host ""
-    Write-Host "$($existing.Count) jar(s) already in $ModsDir :" -ForegroundColor Yellow
-    $existing | ForEach-Object { Write-Host "  $($_.Name)" }
-    if (-not $NonInteractive) {
-        $proceed = Read-Host "Continue? Files with the same name will be overwritten [Y/n]"
-        if ($proceed -and $proceed -notmatch '^[Yy]') {
-            Write-Host "Aborted." -ForegroundColor Yellow
-            return
-        }
-    }
-}
-
 # -- Resolve versions --------------------------------------------------------
 
 Write-Banner "Resolving latest versions for $MinecraftVersion + Fabric"
@@ -177,18 +162,43 @@ foreach ($mod in $modrinthMods) {
     }
 }
 
+# -- Partition into download vs skip ----------------------------------------
+
+# Skip any planned file that already exists in the mods dir with the matching size.
+# A size mismatch usually means a partial download; redownload those.
+$toDownload = @()
+$toSkip     = @()
+foreach ($item in $plan) {
+    $dest = Join-Path $ModsDir $item.filename
+    if ((Test-Path $dest) -and ((Get-Item $dest).Length -eq $item.size)) {
+        $toSkip += $item
+    } else {
+        $toDownload += $item
+    }
+}
+
 # -- Show plan + confirm -----------------------------------------------------
 
 Write-Banner "Plan"
-$plan | ForEach-Object {
-    $sizeMb = [math]::Round($_.size / 1MB, 2)
-    Write-Host ("  {0,-22} {1,7} MB  {2}" -f $_.label, $sizeMb, $_.filename)
+if ($toSkip.Count -gt 0) {
+    Write-Host "Already present (will skip):" -ForegroundColor Yellow
+    $toSkip | ForEach-Object { Write-Host ("  {0,-22}  {1}" -f $_.label, $_.filename) }
 }
-$totalMb = [math]::Round(($plan | Measure-Object -Property size -Sum).Sum / 1MB, 2)
-Write-Host ""
-Write-Host "  Total: $totalMb MB across $($plan.Count) jars"
+if ($toDownload.Count -gt 0) {
+    if ($toSkip.Count -gt 0) { Write-Host "" }
+    Write-Host "Will download:"
+    $toDownload | ForEach-Object {
+        $sizeMb = [math]::Round($_.size / 1MB, 2)
+        Write-Host ("  {0,-22}  {1,7} MB  {2}" -f $_.label, $sizeMb, $_.filename)
+    }
+    $totalMb = [math]::Round(($toDownload | Measure-Object -Property size -Sum).Sum / 1MB, 2)
+    Write-Host ""
+    Write-Host "  Total: $totalMb MB across $($toDownload.Count) jars"
+} else {
+    Write-Host "Nothing to download -- all five jars are already in place." -ForegroundColor Green
+}
 
-if (-not $NonInteractive) {
+if ($toDownload.Count -gt 0 -and -not $NonInteractive) {
     $confirm = Read-Host "`nDownload to $ModsDir [Y/n]"
     if ($confirm -and $confirm -notmatch '^[Yy]') {
         Write-Host "Aborted." -ForegroundColor Yellow
@@ -198,16 +208,18 @@ if (-not $NonInteractive) {
 
 # -- Download ----------------------------------------------------------------
 
-Write-Banner "Downloading"
-foreach ($item in $plan) {
-    $dest = Join-Path $ModsDir $item.filename
-    $sizeMb = [math]::Round($item.size / 1MB, 2)
-    Write-Host ("  {0,7} MB  {1}" -f $sizeMb, $item.filename)
-    try {
-        Invoke-WebRequest -Uri $item.url -OutFile $dest -UseBasicParsing
-    } catch {
-        Write-Host "  -> FAILED: $($_.Exception.Message)" -ForegroundColor Red
-        throw
+if ($toDownload.Count -gt 0) {
+    Write-Banner "Downloading"
+    foreach ($item in $toDownload) {
+        $dest = Join-Path $ModsDir $item.filename
+        $sizeMb = [math]::Round($item.size / 1MB, 2)
+        Write-Host ("  {0,7} MB  {1}" -f $sizeMb, $item.filename)
+        try {
+            Invoke-WebRequest -Uri $item.url -OutFile $dest -UseBasicParsing
+        } catch {
+            Write-Host "  -> FAILED: $($_.Exception.Message)" -ForegroundColor Red
+            throw
+        }
     }
 }
 
@@ -240,7 +252,7 @@ if ($IdentityFile) {
 # -- Done --------------------------------------------------------------------
 
 Write-Banner "Done"
-Write-Host "Installed $($plan.Count) jars into $ModsDir." -ForegroundColor Green
+Write-Host "$($plan.Count) jars in place at $ModsDir ($($toSkip.Count) skipped, $($toDownload.Count) downloaded)." -ForegroundColor Green
 Write-Host ""
 Write-Host "Launch Minecraft, pick the Fabric 1.20.1 profile, then:"
 Write-Host "  Mods -> OpenZiti MC -> Configure  (verify identity path + service name)"
