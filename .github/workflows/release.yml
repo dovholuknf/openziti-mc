@@ -47,4 +47,4 @@ jobs:
             -ModrinthProjectId "${{ secrets.MODRINTH_PROJECT_ID }}" `
             -GitHubToken "${{ secrets.GITHUB_TOKEN }}" `
             -GitHubRepo "${{ github.repository }}" `
-            -Changelog "Release ${{ steps.ver.outputs.version }}. See https://github.com/${{ github.repository }}/blob/main/PLAN.md for v1 scope."
+            -Changelog "Release ${{ steps.ver.outputs.version }}. See https://github.com/${{ github.repository }}/blob/main/README.md and https://github.com/${{ github.repository }}/blob/main/SETUP.md for setup, configuration, and install steps."
