@@ -8,9 +8,9 @@
     "${mod_author}"
   ],
   "contact": {
-    "homepage": "https://github.com/dovholuknf/ziti-minecraft",
-    "sources": "https://github.com/dovholuknf/ziti-minecraft",
-    "issues": "https://github.com/dovholuknf/ziti-minecraft/issues"
+    "homepage": "https://github.com/dovholuknf/openziti-mc",
+    "sources": "https://github.com/dovholuknf/openziti-mc",
+    "issues": "https://github.com/dovholuknf/openziti-mc/issues"
   },
   "license": "Apache-2.0",
   "environment": "*",

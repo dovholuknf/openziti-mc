@@ -477,7 +477,7 @@ outdated version of Architectury Loom!` on every configure phase. We pinned Loom
 which is the last line that cleanly supports MC 1.20.1. Newer Loom (1.10+ era) targets
 1.21+. The warning is cosmetic and will go away if/when we bump the MC target.
 
-Repo: https://github.com/dovholuknf/ziti-minecraft (Apache-2.0).
+Repo: https://github.com/dovholuknf/openziti-mc (Apache-2.0).
 
 ## Credits and references
 

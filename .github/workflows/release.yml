@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Compute version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"   # e.g. v0.1.0
+          $version = $tag.TrimStart('v')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          ./scripts/publish.ps1 `
+            -Version "${{ steps.ver.outputs.version }}" `
+            -ModrinthToken "${{ secrets.MODRINTH_TOKEN }}" `
+            -ModrinthProjectId "${{ vars.MODRINTH_PROJECT_ID }}" `
+            -GitHubToken "${{ secrets.GITHUB_TOKEN }}" `
+            -GitHubRepo "${{ github.repository }}" `
+            -Changelog "Release ${{ steps.ver.outputs.version }}. See https://github.com/${{ github.repository }}/blob/main/PLAN.md for v1 scope."
