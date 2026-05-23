@@ -116,7 +116,25 @@ Write-Host "Jar: $($jarFile.FullName) ($([math]::Round($jarFile.Length / 1MB, 2)
 if ($ModrinthToken) {
     if (-not $ModrinthProjectId) { throw "ModrinthProjectId is required when ModrinthToken is set." }
 
-    Write-Host "Uploading to Modrinth (project=$ModrinthProjectId, version=$Version) ..."
+    $modrinthHeaders = @{
+        Authorization = $ModrinthToken
+        "User-Agent"  = "dovholuknf/openziti-mc publish.ps1"
+    }
+
+    # Modrinth's /v2/version API wants the project's base62 short ID, not the slug.
+    # Resolve via /v2/project/{slug-or-id} which accepts either and returns the canonical id.
+    Write-Host "Resolving Modrinth project '$ModrinthProjectId' ..."
+    try {
+        $projectInfo = Invoke-RestMethod -Method Get -Uri "https://api.modrinth.com/v2/project/$ModrinthProjectId" -Headers $modrinthHeaders
+        $resolvedProjectId = $projectInfo.id
+        Write-Host "  -> ID: $resolvedProjectId (slug: $($projectInfo.slug))"
+    }
+    catch {
+        $errBody = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { "" }
+        throw "Failed to look up Modrinth project '$ModrinthProjectId': $($_.Exception.Message)`n$errBody"
+    }
+
+    Write-Host "Uploading to Modrinth (project=$resolvedProjectId, version=$Version) ..."
 
     $metadata = @{
         name           = "ziti-minecraft $Version"
@@ -129,7 +147,7 @@ if ($ModrinthToken) {
             @{ project_id = "P7dR8mSH"; dependency_type = "required" }   # Fabric API
             @{ project_id = "lhGA9TYQ"; dependency_type = "required" }   # Architectury API
         )
-        project_id     = $ModrinthProjectId
+        project_id     = $resolvedProjectId
         file_parts     = @("file_0")
         primary_file   = "file_0"
         changelog      = $Changelog
@@ -167,16 +185,12 @@ if ($ModrinthToken) {
     $bw.Flush()
     $bodyBytes = $bodyStream.ToArray()
 
-    $headers = @{
-        Authorization = $ModrinthToken
-        "User-Agent"  = "dovholuknf/openziti-mc publish.ps1"
-    }
     try {
         $resp = Invoke-RestMethod -Method Post -Uri "https://api.modrinth.com/v2/version" `
-            -Headers $headers -ContentType "multipart/form-data; boundary=$boundary" `
+            -Headers $modrinthHeaders -ContentType "multipart/form-data; boundary=$boundary" `
             -Body $bodyBytes
         Write-Host "  -> Modrinth version id: $($resp.id)"
-        Write-Host "  -> https://modrinth.com/mod/$ModrinthProjectId/version/$($resp.version_number)"
+        Write-Host "  -> https://modrinth.com/mod/$($projectInfo.slug)/version/$($resp.version_number)"
     }
     catch {
         # PS 7+: response body lives on ErrorDetails.Message
