@@ -82,6 +82,15 @@ public final class ZitiMc {
         }
     }
 
+    /**
+     * Non-blocking accessor for diagnostics (e.g. the settings screen's status block).
+     * Returns the loaded context if {@link #zitiContext()} has already populated it,
+     * otherwise null. Never triggers a load.
+     */
+    public static ZitiContext zitiContextOrNull() {
+        return ZITI_CONTEXT;
+    }
+
     private static void waitForActive(ZitiContext ctx) {
         long deadline = System.nanoTime() + WARMUP_TIMEOUT_NANOS;
         while (System.nanoTime() < deadline) {
