@@ -104,6 +104,13 @@ mc-1.21.4/                       # per-version Loom build (Java 21, MC 1.21.4)
 Common's source set is pulled into each mc-* module so the same code compiles
 against three different MC mapping JARs. No Java code is duplicated across modules.
 
+## What's next
+
+Planned v0.4.0+ work tracked in [TODO.md](TODO.md). Highlights: service
+Dial/Bind permissions in the UI, a log-level dropdown, force-refresh of the
+service catalog on dial, and a Loom bump to enable the seven 1.21.5+ targets
+currently scaffolded but commented out in `settings.gradle`.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
