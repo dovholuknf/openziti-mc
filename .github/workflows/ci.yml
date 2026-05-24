@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [ main ]
 
+# Force checkout / cache / setup-java / upload-artifact actions onto Node.js 24.
+# Their published v4 tags still ship Node 20 binaries, which GitHub deprecates
+# starting June 2 2026. Opting in early kills the warning and avoids a forced
+# migration breaking us. Remove this env once the action authors ship v5 (or
+# whichever tag) on Node 24.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     runs-on: windows-latest

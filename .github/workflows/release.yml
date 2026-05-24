@@ -16,6 +16,14 @@ on:
 permissions:
   contents: write   # needed to create GitHub Releases
 
+# Force checkout / cache / setup-java / upload-artifact actions onto Node.js 24.
+# Their published v4 tags still ship Node 20 binaries, which GitHub deprecates
+# starting June 2 2026. Opting in early kills the warning and avoids a forced
+# migration breaking us. Remove this env once the action authors ship v5 (or
+# whichever tag) on Node 24.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   enumerate:
     runs-on: windows-latest
@@ -70,9 +78,12 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # --configure-on-demand skips configuring the other 17 sibling mc-* modules
+      # this runner doesn't need. Cuts per-runner configure time roughly in half by
+      # avoiding fabric-api / MC-mappings downloads for unrelated MC versions.
       - name: Build :mc-${{ matrix.mc }}:build
         shell: pwsh
-        run: ./gradlew ":mc-${{ matrix.mc }}:build" --no-daemon
+        run: ./gradlew ":mc-${{ matrix.mc }}:build" --no-daemon --configure-on-demand
 
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
