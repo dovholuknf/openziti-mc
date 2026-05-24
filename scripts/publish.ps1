@@ -1,24 +1,42 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds and publishes a multi-MC-version OpenZiti MC release.
+    Publishes a multi-MC-version OpenZiti MC release.
 
 .DESCRIPTION
-    Self-contained release pipeline. Builds one jar per supported Minecraft version
-    (mc-1.20.1, mc-1.21.1, mc-1.21.4), then:
-      - creates ONE GitHub Release with all three jars attached.
-      - creates ONE Modrinth version PER MC target, each tagged with that single
-        MC version (Modrinth filters by game_versions, so a separate version per
-        target is the standard pattern).
+    Self-contained release pipeline. Two modes:
 
-    Runs identically from a developer workstation and from GitHub Actions.
+      1. **Local mode** (default): builds every active `mc-X.Y.Z` module via
+         `./gradlew build`, then enumerates the produced jars under
+         `mc-*/build/libs/openziti-mc-<Version>.mc*.jar`.
+
+      2. **Artifacts mode** (`-ArtifactsDir <dir>`): skips the build and
+         enumerates jars under that directory (recursively). Used by the
+         matrix release workflow: each matrix job builds one module and
+         uploads the jar as an artifact; the final release job downloads all
+         artifacts into one dir and runs publish.ps1 over it.
+
+    Both modes converge on the same upload flow:
+      - one Modrinth version per MC target, tagged with that single MC version
+      - one GitHub Release with every jar attached
+
+    Adding a new MC version requires only an `include "mc-X.Y.Z"` line in
+    settings.gradle plus the module dir; publish.ps1 discovers it from the
+    filesystem and no longer needs a hardcoded list.
 
 .PARAMETER Version
-    Semantic version for this release, e.g. "0.3.0". Must match gradle.properties
-    mod_version.
+    Semantic version for this release, e.g. "0.3.3". Must match
+    gradle.properties mod_version.
+
+.PARAMETER ArtifactsDir
+    Optional directory containing pre-built jars (matrix-build flow). When
+    set, skips the local gradle build and scans this dir recursively for
+    `openziti-mc-<Version>.mc*.jar` files (the -dev-shadow and -sources jars
+    are ignored).
 
 .PARAMETER SkipBuild
-    Skip the gradle build (jars must already exist under each module's build/libs).
+    Local mode only: skip `./gradlew build` even though no ArtifactsDir was
+    supplied. The jars must already exist under each module's build/libs.
 
 .PARAMETER ModrinthToken
     Modrinth API token. Empty = skip Modrinth.
@@ -40,20 +58,27 @@
     "release", "beta", or "alpha". Modrinth metadata.
 
 .EXAMPLE
-    # Dry run -- build everything, no uploads.
-    .\scripts\publish.ps1 -Version 0.3.0
+    # Dry run, local: build everything, no uploads.
+    .\scripts\publish.ps1 -Version 0.3.3
 
 .EXAMPLE
-    # Full release.
-    .\scripts\publish.ps1 -Version 0.3.0 `
+    # Full local release.
+    .\scripts\publish.ps1 -Version 0.3.3 `
         -ModrinthToken $env:MODRINTH_TOKEN -ModrinthProjectId openziti-mc `
         -GitHubToken $env:GITHUB_TOKEN -GitHubRepo dovholuknf/openziti-mc `
-        -Changelog "Multi-version release: 1.20.1, 1.21.1, 1.21.4."
+        -Changelog "Matrix build + 9 more MC version targets."
+
+.EXAMPLE
+    # CI artifacts mode (after matrix build).
+    .\scripts\publish.ps1 -Version 0.3.3 -ArtifactsDir artifacts `
+        -ModrinthToken $env:MODRINTH_TOKEN -ModrinthProjectId openziti-mc `
+        -GitHubToken $env:GITHUB_TOKEN -GitHubRepo dovholuknf/openziti-mc
 #>
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string]   $Version,
+    [string]                          $ArtifactsDir      = "",
     [switch]                          $SkipBuild,
     [string]                          $ModrinthToken     = "",
     [string]                          $ModrinthProjectId = "",
@@ -71,16 +96,6 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
 
 # -------------------------------------------------------------------------
-# Layout: the modules we ship a jar for. Add a new MC version by adding a row.
-# -------------------------------------------------------------------------
-
-$targets = @(
-    [PSCustomObject]@{ module = "mc-1.20.1"; mc = "1.20.1" }
-    [PSCustomObject]@{ module = "mc-1.21.1"; mc = "1.21.1" }
-    [PSCustomObject]@{ module = "mc-1.21.4"; mc = "1.21.4" }
-)
-
-# -------------------------------------------------------------------------
 # 1. Sanity: requested version must match gradle.properties mod_version.
 # -------------------------------------------------------------------------
 
@@ -91,31 +106,73 @@ if ($gradleVersion -ne $Version) {
 }
 
 # -------------------------------------------------------------------------
-# 2. Build all modules in one shot.
+# 2. Build (local mode only).
 # -------------------------------------------------------------------------
 
-if (-not $SkipBuild) {
-    Write-Host "Building all modules ..."
+if (-not $ArtifactsDir -and -not $SkipBuild) {
+    Write-Host "Building every active mc-* module via ./gradlew build ..."
     & ./gradlew build --no-daemon
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed (exit $LASTEXITCODE)." }
 }
 
-# Resolve the produced jar for each target.
-foreach ($t in $targets) {
-    $jarName = "openziti-mc-$Version.mc$($t.mc).jar"
-    $jarPath = Join-Path $repoRoot "$($t.module)/build/libs/$jarName"
-    if (-not (Test-Path $jarPath)) {
-        throw "Built jar not found at $jarPath. Did :$($t.module):build succeed?"
+# -------------------------------------------------------------------------
+# 3. Discover jars and infer the MC target from each filename.
+#    Naming convention: openziti-mc-<Version>.mc<MC>.jar
+# -------------------------------------------------------------------------
+
+if ($ArtifactsDir) {
+    if (-not (Test-Path $ArtifactsDir)) {
+        throw "ArtifactsDir '$ArtifactsDir' does not exist."
     }
-    $jar = Get-Item $jarPath
-    Add-Member -InputObject $t -NotePropertyName jarPath -NotePropertyValue $jar.FullName
-    Add-Member -InputObject $t -NotePropertyName jarName -NotePropertyValue $jar.Name
-    Add-Member -InputObject $t -NotePropertyName jarSize -NotePropertyValue $jar.Length
-    Write-Host ("  {0,-10}  {1,7:F2} MB  {2}" -f $t.mc, ($jar.Length / 1MB), $jar.Name)
+    $jarRoot = (Resolve-Path $ArtifactsDir).Path
+    Write-Host "Using pre-built jars from $jarRoot"
+} else {
+    $jarRoot = Join-Path $repoRoot "."
+    Write-Host "Discovering jars under mc-*/build/libs/ ..."
+}
+
+# Match openziti-mc-<exact version>.mc<MC>.jar where <MC> is strictly
+# digits-and-dots. Rejects Loom's intermediate -dev.jar, -dev-shadow.jar,
+# and -sources.jar variants because their classifier follows the MC version
+# with a literal "-" which the pattern doesn't allow.
+$verEscaped = [regex]::Escape($Version)
+$jarRegex   = "^openziti-mc-$verEscaped\.mc(\d+(?:\.\d+)*)\.jar$"
+
+$targets = New-Object System.Collections.ArrayList
+$allJars = Get-ChildItem -Path $jarRoot -Filter "openziti-mc-*.jar" -Recurse -File
+foreach ($jar in $allJars) {
+    if ($jar.Name -match $jarRegex) {
+        $mc = $matches[1]
+        [void]$targets.Add([PSCustomObject]@{
+            mc      = $mc
+            jarPath = $jar.FullName
+            jarName = $jar.Name
+            jarSize = $jar.Length
+        })
+    }
+}
+
+if ($targets.Count -eq 0) {
+    throw "No jars matching 'openziti-mc-$Version.mc*.jar' found under $jarRoot. Build first, or pass -ArtifactsDir to a directory containing them."
+}
+
+# Sort MC versions naturally (so "1.20" < "1.20.1" < "1.21" etc.) by
+# splitting each version into its dotted components and comparing as ints.
+$targets = $targets | Sort-Object {
+    $parts = $_.mc.Split('.') | ForEach-Object { [int]$_ }
+    # Pad to 4 parts so 1.21 sorts before 1.21.1.
+    while ($parts.Count -lt 4) { $parts += -1 }
+    [int64]($parts[0] * 1000000000 + $parts[1] * 1000000 + ($parts[2] + 1) * 1000 + ($parts[3] + 1))
+}
+
+Write-Host ""
+Write-Host "Targets to publish ($($targets.Count)):"
+foreach ($t in $targets) {
+    Write-Host ("  {0,-10}  {1,7:F2} MB  {2}" -f $t.mc, ($t.jarSize / 1MB), $t.jarName)
 }
 
 # -------------------------------------------------------------------------
-# 3. Modrinth uploads -- one version per MC target.
+# 4. Modrinth uploads -- one version per MC target.
 # -------------------------------------------------------------------------
 
 if ($ModrinthToken) {
@@ -126,6 +183,7 @@ if ($ModrinthToken) {
         "User-Agent"  = "dovholuknf/openziti-mc publish.ps1"
     }
 
+    Write-Host ""
     Write-Host "Resolving Modrinth project '$ModrinthProjectId' ..."
     try {
         $projectInfo       = Invoke-RestMethod -Method Get -Uri "https://api.modrinth.com/v2/project/$ModrinthProjectId" -Headers $modrinthHeaders
@@ -197,13 +255,14 @@ if ($ModrinthToken) {
 }
 
 # -------------------------------------------------------------------------
-# 4. GitHub Release -- one release with all three jars attached.
+# 5. GitHub Release -- one release with every jar attached.
 # -------------------------------------------------------------------------
 
 if ($GitHubToken) {
     if (-not $GitHubRepo) { throw "GitHubRepo is required when GitHubToken is set." }
 
     $tag = "v$Version"
+    Write-Host ""
     Write-Host "Creating GitHub Release $tag in $GitHubRepo ..."
 
     $createBody = @{

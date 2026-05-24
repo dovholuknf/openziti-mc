@@ -1,5 +1,13 @@
 name: Release
 
+# Matrix build: each MC target builds on its own runner in parallel. After all
+# matrix jobs finish, a final job downloads every jar artifact into one dir and
+# runs publish.ps1 to create the GitHub Release and push the Modrinth versions.
+#
+# All logic lives in scripts/list-modules.ps1 and scripts/publish.ps1 so the
+# entire flow can run locally (build all modules, then publish.ps1 over the
+# build outputs); the workflow only shells those scripts.
+
 on:
   push:
     tags:
@@ -9,14 +17,44 @@ permissions:
   contents: write   # needed to create GitHub Releases
 
 jobs:
-  release:
+  enumerate:
     runs-on: windows-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+      version: ${{ steps.ver.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # mc-1.21.x modules need Java 21. Gradle's foojay resolver downloads JDK 17
-      # for the mc-1.20.1 module on demand.
+      - name: Compute version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: List active MC modules
+        id: list
+        shell: pwsh
+        run: |
+          $matrix = ./scripts/list-modules.ps1
+          Write-Host "matrix=$matrix"
+          "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+  build:
+    needs: enumerate
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ${{ fromJson(needs.enumerate.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # mc-1.21.x modules need Java 21. Gradle's foojay resolver downloads JDK
+      # 17 for the 1.20.4-and-earlier modules on demand.
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -32,21 +70,46 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      - name: Compute version from tag
-        id: ver
+      - name: Build :mc-${{ matrix.mc }}:build
         shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}"   # e.g. v0.1.0
-          $version = $tag.TrimStart('v')
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        run: ./gradlew ":mc-${{ matrix.mc }}:build" --no-daemon
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openziti-mc-${{ matrix.mc }}
+          path: |
+            mc-${{ matrix.mc }}/build/libs/openziti-mc-*.mc${{ matrix.mc }}.jar
+            !mc-${{ matrix.mc }}/build/libs/*-dev-shadow.jar
+            !mc-${{ matrix.mc }}/build/libs/*-sources.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [enumerate, build]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all jar artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List downloaded jars
+        shell: pwsh
+        run: Get-ChildItem -Path artifacts -Recurse -File | Select-Object FullName, Length
 
       - name: Publish
         shell: pwsh
         run: |
           ./scripts/publish.ps1 `
-            -Version "${{ steps.ver.outputs.version }}" `
+            -Version "${{ needs.enumerate.outputs.version }}" `
+            -ArtifactsDir "artifacts" `
             -ModrinthToken "${{ secrets.MODRINTH_TOKEN }}" `
             -ModrinthProjectId "${{ secrets.MODRINTH_PROJECT_ID }}" `
             -GitHubToken "${{ secrets.GITHUB_TOKEN }}" `
             -GitHubRepo "${{ github.repository }}" `
-            -Changelog "Release ${{ steps.ver.outputs.version }}. See https://github.com/${{ github.repository }}/blob/main/README.md and https://github.com/${{ github.repository }}/blob/main/SETUP.md for setup, configuration, and install steps."
+            -Changelog "Release ${{ needs.enumerate.outputs.version }}. See https://github.com/${{ github.repository }}/blob/main/README.md and https://github.com/${{ github.repository }}/blob/main/SETUP.md for setup, configuration, and install steps."
