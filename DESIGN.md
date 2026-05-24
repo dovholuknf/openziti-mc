@@ -112,22 +112,24 @@ ViaFabricPlus, etc.).
 
 ### Configuration
 
-v1 config file: `config/openziti.json`, schema:
+Config file: `config/openziti.json`, schema (as shipped):
 
 ```json
 {
   "identityPath": "config/openziti/identity.json",
-  "addressDetection": "implicit",
-  "serverBind": {
-    "enabled": false,
-    "serviceName": ""
-  }
+  "serverEnabled": false,
+  "serviceName": "openziti-mc"
 }
 ```
 
-- `addressDetection`: `implicit` (heuristic) or `prefix` (must start with `ziti:`).
-- `serverBind.enabled`: opt-in for the server-side bind so single-player worlds and
-  client installations don't spin up a Ziti listener they don't need.
+- `serverEnabled`: opt-in for the server-side bind so single-player worlds and
+  client installations don't spin up a Ziti listener they don't need. When true the
+  vanilla TCP listener is also closed (zero-trust posture).
+- `serviceName`: the OpenZiti service to bind on. Only used when `serverEnabled` is
+  true.
+- The initial `addressDetection` enum (implicit / prefix) was removed during v0.2.x
+  simplification -- the implicit heuristic with a `localhost`/`local`/`lan`
+  deny-list is the only mode now.
 
 ## Loader differences worth flagging
 

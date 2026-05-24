@@ -326,8 +326,8 @@ public abstract class ServerConnectionListenerMixin {
 
     @Inject(method = "startTcpServerListener", at = @At("TAIL"))
     private void zitimc$bindZitiListener(InetAddress address, int port, CallbackInfo ci) {
-        if (!ZitiMc.config().serverBind.enabled) return;
-        String service = ZitiMc.config().serverBind.serviceName;
+        if (!ZitiMc.config().serverEnabled) return;
+        String service = ZitiMc.config().serviceName;
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.channelFactory(new ZitiServerChannelFactory(ZitiMc.zitiContext()));
@@ -344,7 +344,7 @@ The neat detail is the `@Shadow @Final` on vanilla's `channels` list. By appendi
 Ziti `ChannelFuture` to that list, vanilla's existing `stop()` loop closes it for us --
 no separate `@Inject(at = HEAD)` on `stop()` needed.
 
-Gated by `config.serverBind.enabled`. Defaults off so installations that only need the
+Gated by `config.serverEnabled`. Defaults off so installations that only need the
 client side do not spin up a Ziti listener.
 
 ## Identity wiring
@@ -431,14 +431,15 @@ configured and only ever connect to vanilla TCP servers, the mod is silent.
 ```json
 {
   "identityPath": "config/openziti/identity.json",
-  "addressDetection": "implicit",
-  "serverBind": { "enabled": false, "serviceName": "" }
+  "serverEnabled": false,
+  "serviceName": "openziti-mc"
 }
 ```
 
-`addressDetection` toggles between the "no dot, no colon" heuristic and a strict
-`ziti:`-prefix mode. The heuristic is friendly; the prefix is unambiguous. Some users
-will want one, some the other.
+`serverEnabled` is the only toggle that matters: off for client-only installs, on
+when this MC instance is going to host (via Open-to-LAN or as a dedicated server).
+Address detection uses a fixed "no dot, no colon, not all-digits" heuristic with a
+deny-list for `localhost` / `local` / `lan`.
 
 ## What we explicitly chose NOT to do
 
@@ -458,8 +459,8 @@ Lessons cost time too:
 Both directions wired and validated against a real Ziti controller:
 
 - Client side: type `my-service` into Add Server, mod resolves and dials via Ziti.
-- Server side: dedicated/integrated server binds on a Ziti service alongside its
-  normal TCP listener (gated by `config.serverBind.enabled`).
+- Server side: dedicated/integrated server binds on a Ziti service and closes the
+  vanilla TCP listener (gated by `config.serverEnabled`).
 - An MC server connection over Ziti reaches the protocol layer; on first end-to-end
   test the server logged the inbound `GameProfile` with the dialing Ziti identity
   visible in `Connection.toString()` -- the SDK passes `callerId=<dialing-identity>`

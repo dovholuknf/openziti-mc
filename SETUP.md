@@ -110,20 +110,23 @@ Move-Item .\server-mc.json .\run-server\config\openziti\identity.json
 
 ## 6. Configure the mod
 
-Open the in-game **Mods -> OpenZiti MC -> Configure** screen (ModMenu). Two tabs:
-**OpenZiti** (the working backend) and **zrok** (placeholder for v0.3.0).
+Open the in-game **Mods -> OpenZiti MC -> Configure** screen (ModMenu). The screen
+shows a status block at the top (identity-file presence, Ziti context state) and two
+editable fields:
 
-The OpenZiti tab has three fields:
-
-- **Identity file** -- path to your enrolled identity .json, relative to the Minecraft
-  instance directory. Default `config/openziti/identity.json`.
-- **OpenZiti server enabled** -- opt-in for hosting. Off by default because most users
-  are client-only. When on: your dedicated/integrated server binds on the OpenZiti
-  service in place of its TCP listener (zero-trust). When off: this MC install is
-  client-only -- you can still dial *other* peoples' Ziti services in Add Server, you
-  just won't host one yourself.
+- **OpenZiti server enabled** -- opt-in for hosting via Open-to-LAN. Off by default
+  because most users are client-only. When on: the integrated server (the one MC
+  spins up when you click "Open to LAN" in the pause menu) binds on the OpenZiti
+  service in place of its TCP listener -- zero-trust posture. When off: this MC
+  install is client-only and can still dial *other* peoples' Ziti services in Add
+  Server. **Not necessary if you run a separate dedicated server** -- the dedicated
+  server has its own copy of the mod and its own config.
 - **Service name** -- the OpenZiti service to bind on. Used only when **OpenZiti
   server enabled** is on.
+
+The identity file path is not exposed in the UI -- the mod loads from
+`config/openziti/identity.json` relative to the Minecraft instance directory. Power
+users can override by hand-editing `config/openziti.json`.
 
 Equivalent JSON in `config/openziti.json`:
 
@@ -131,15 +134,15 @@ Equivalent JSON in `config/openziti.json`:
 {
   "identityPath": "config/openziti/identity.json",
   "serverEnabled": true,
-  "serviceName": "openziti-mc",
-  "zrokShareToken": ""
+  "serviceName": "openziti-mc"
 }
 ```
 
 Both the client install and the server install use the same schema. The only
 substantive difference is the identity file on each side and whether
-**serverEnabled** is on (off on a pure-client install, on for a host). All fields
-require a restart; Cloth Config prompts for one automatically after Save.
+**serverEnabled** is on (off on a pure-client install, on for a host that uses
+Open-to-LAN). All fields require a restart; Cloth Config prompts for one
+automatically after Save.
 
 ## 7. Dev-only: turn off Mojang auth on the server
 

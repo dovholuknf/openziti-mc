@@ -18,10 +18,14 @@ identity into place:
 iwr https://raw.githubusercontent.com/dovholuknf/openziti-mc/main/scripts/install-mods.ps1 | iex
 ```
 
-Or save and run with parameters:
+(`iwr | iex` runs the script directly without saving it to disk, which sidesteps
+Windows' unsigned-script block.)
+
+Or save it locally and pass parameters:
 
 ```powershell
 iwr https://raw.githubusercontent.com/dovholuknf/openziti-mc/main/scripts/install-mods.ps1 -OutFile install-mods.ps1
+Unblock-File .\install-mods.ps1   # strips Windows' "downloaded from internet" marker
 .\install-mods.ps1
 ```
 
