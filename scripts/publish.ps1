@@ -102,7 +102,7 @@ if (-not $SkipBuild) {
 
 # Resolve the produced jar for each target.
 foreach ($t in $targets) {
-    $jarName = "openziti-mc-$Version+mc$($t.mc).jar"
+    $jarName = "openziti-mc-$Version.mc$($t.mc).jar"
     $jarPath = Join-Path $repoRoot "$($t.module)/build/libs/$jarName"
     if (-not (Test-Path $jarPath)) {
         throw "Built jar not found at $jarPath. Did :$($t.module):build succeed?"
@@ -137,7 +137,9 @@ if ($ModrinthToken) {
     }
 
     foreach ($t in $targets) {
-        $modrinthVersion = "$Version+mc$($t.mc)"
+        # Use "." separator so the Modrinth version_number matches the GitHub asset
+        # filename (GitHub sanitizes "+" to "." in asset names).
+        $modrinthVersion = "$Version.mc$($t.mc)"
         Write-Host "Uploading to Modrinth: $modrinthVersion (mc=$($t.mc)) ..."
 
         $metadata = @{

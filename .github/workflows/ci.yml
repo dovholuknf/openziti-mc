@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openziti-mc-jars
-          path: mc-*/build/libs/openziti-mc-*+mc*.jar
+          path: mc-*/build/libs/openziti-mc-*.mc*.jar
           if-no-files-found: error

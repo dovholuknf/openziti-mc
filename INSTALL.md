@@ -114,7 +114,7 @@ Direct from GitHub Releases:
 1. Open https://github.com/dovholuknf/openziti-mc/releases
 2. Find the **latest** release at the top.
 3. Under **Assets**, click the jar tagged with your MC version, e.g.
-   `openziti-mc-0.3.0+mc1.21.4.jar`. The browser downloads it.
+   `openziti-mc-0.3.1.mc1.21.4.jar`. The browser downloads it.
 4. Move the downloaded file into `%APPDATA%\.minecraft\mods\`.
 
 Or via Modrinth:
@@ -223,7 +223,7 @@ are the first two places to look.
 
 | Symptom                                                  | Fix                                                                                                                                |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| MC won't launch -- "Incompatible mods" screen on startup | Wrong jar for your MC version. Confirm the jar filename ends `+mc<version>.jar` matching your Fabric profile.                      |
+| MC won't launch -- "Incompatible mods" screen on startup | Wrong jar for your MC version. Confirm the jar filename ends `.mc<version>.jar` matching your Fabric profile.                      |
 | "Identity file: NOT FOUND" in Configure                  | The `.json` isn't at `config\openziti\identity.json` under the instance dir. Redo Step 4.                                          |
 | Connect fails immediately, "Couldn't connect"            | Service name mismatch, or your identity doesn't have Dial permission. Confirm with the host.                                       |
 | Connect takes ~30 seconds then fails on first attempt    | SDK catalog warmup. Click Join again -- the second attempt usually succeeds.                                                       |

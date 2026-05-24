@@ -17,7 +17,7 @@ match the exact controller objects exported from a known-good install (see
 4. **Minecraft + Java**. Pick a supported target:
    - MC 1.20.1 needs Java 17 (Temurin recommended).
    - MC 1.21.1 or 1.21.4 needs Java 21 (Temurin recommended).
-5. The mod jar from `mc-<version>/build/libs/openziti-mc-<ver>+mc<version>.jar` on
+5. The mod jar from `mc-<version>/build/libs/openziti-mc-<ver>.mc<version>.jar` on
    both client and server.
 
 If you do not have a controller yet, the fastest path is
@@ -225,7 +225,7 @@ attribute from step 1). Friend B's identity needs Dial permission
 | Client logs `ServiceNotAvailable`                                | First dial races the SDK's catalog sync                                                                 | Already handled by the mod's catalog-wait + 5-retry loop. If persistent, check service policies. |
 | Client logs `exceeded maximum [2] retries creating circuit`      | Edge router cannot reach the binder. Either binder is down, or no `mc-erp` / `mc-serp` policies         | Verify `ziti edge list terminators` shows your service, server log shows `Ziti listener bound` |
 | `lost connection: Disconnected` immediately after Login Start    | `online-mode=true` on the server, dev client is offline                                                 | Set `online-mode=false` for dev (see step 7)                                                  |
-| `ClassNotFoundException: org.openziti.netty.ZitiChannelFactory` at startup | Mod jar is missing the bundled Ziti SDK                                                            | Rebuild with `./gradlew build`; production jars are at `mc-<version>/build/libs/openziti-mc-*+mc*.jar` |
+| `ClassNotFoundException: org.openziti.netty.ZitiChannelFactory` at startup | Mod jar is missing the bundled Ziti SDK                                                            | Rebuild with `./gradlew build`; production jars are at `mc-<version>/build/libs/openziti-mc-*.mc*.jar` |
 | Mod's `init` logs no identity path                               | `config/openziti.json` missing or unreadable                                                            | The mod writes defaults on first launch; check working dir matches the run task (`run/` vs `run-server/`) |
 | Server log shows `Closing vanilla TCP listener(s)`               | Expected behavior when **OpenZiti server enabled** is on                                                | This is the zero-trust posture. To get the TCP listener back, turn the toggle off.            |
 

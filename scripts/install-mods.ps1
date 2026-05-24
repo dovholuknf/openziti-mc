@@ -114,10 +114,13 @@ try {
         "https://api.github.com/repos/dovholuknf/openziti-mc/releases/latest"
     }
     $ghRelease = Invoke-RestMethod -Uri $url -UseBasicParsing
-    # Asset names: openziti-mc-{version}+mc{minecraftVersion}.jar (post-v0.3.0).
-    # Pre-v0.3.0 releases (v0.2.x) used openziti-fabric-*.jar and were 1.20.1-only,
-    # so we only accept those when MC=1.20.1 to avoid serving an incompatible jar.
-    $assetMatch    = "openziti-mc-*+mc${MinecraftVersion}.jar"
+    # Asset names: openziti-mc-{version}.mc{minecraftVersion}.jar (v0.3.1+). GitHub
+    # sanitizes "+" to "." in asset filenames, so we use "." as the separator across
+    # local builds, GitHub Releases, and Modrinth so everything matches.
+    # v0.3.0 shipped with the sanitized ".mc" form too (GitHub did the rewrite), so the
+    # same glob also catches v0.3.0 assets. Pre-v0.3.0 releases (v0.2.x) used
+    # openziti-fabric-*.jar and were 1.20.1-only.
+    $assetMatch    = "openziti-mc-*.mc${MinecraftVersion}.jar"
     $legacyMatch   = if ($MinecraftVersion -eq "1.20.1") { "openziti-fabric-*.jar" } else { $null }
     $asset = $ghRelease.assets `
         | Where-Object { ($_.name -like $assetMatch -or ($legacyMatch -and $_.name -like $legacyMatch)) `

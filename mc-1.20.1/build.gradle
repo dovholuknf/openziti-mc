@@ -7,7 +7,10 @@ base {
     archivesName = "openziti-mc"
 }
 
-version = "${rootProject.mod_version}+mc${mc_version}"
+// Use "." rather than "+" to separate the MC tag: GitHub Releases sanitize "+" in asset
+// filenames, so the local artifact would diverge from the released one. Sticking to "."
+// keeps the same filename across local builds, GitHub Releases, and Modrinth.
+version = "${rootProject.mod_version}.mc${mc_version}"
 group = rootProject.mod_group
 
 sourceSets {

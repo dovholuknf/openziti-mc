@@ -15,9 +15,9 @@ matching your installed MC + Fabric Loader profile:
 
 | Jar                                  | Minecraft | Java |
 | ------------------------------------ | --------- | ---- |
-| `openziti-mc-<ver>+mc1.20.1.jar`     | 1.20.1    | 17   |
-| `openziti-mc-<ver>+mc1.21.1.jar`     | 1.21.1    | 21   |
-| `openziti-mc-<ver>+mc1.21.4.jar`     | 1.21.4    | 21   |
+| `openziti-mc-<ver>.mc1.20.1.jar`     | 1.20.1    | 17   |
+| `openziti-mc-<ver>.mc1.21.1.jar`     | 1.21.1    | 21   |
+| `openziti-mc-<ver>.mc1.21.4.jar`     | 1.21.4    | 21   |
 
 Same source compiled three times against three MC mapping sets. No feature
 differences between jars; pick by your MC version.
@@ -73,9 +73,9 @@ policies in one interactive script. See [SETUP.md](SETUP.md) for the full walkth
 Produces three jars in one shot:
 
 ```
-mc-1.20.1/build/libs/openziti-mc-<ver>+mc1.20.1.jar
-mc-1.21.1/build/libs/openziti-mc-<ver>+mc1.21.1.jar
-mc-1.21.4/build/libs/openziti-mc-<ver>+mc1.21.4.jar
+mc-1.20.1/build/libs/openziti-mc-<ver>.mc1.20.1.jar
+mc-1.21.1/build/libs/openziti-mc-<ver>.mc1.21.1.jar
+mc-1.21.4/build/libs/openziti-mc-<ver>.mc1.21.4.jar
 ```
 
 To build a single MC target:

@@ -23,7 +23,7 @@ are done.
 ## Requirements
 
 - Java Edition 1.20.1 (Java 17), 1.21.1 (Java 21), or 1.21.4 (Java 21). Pick the
-  release jar tagged with your MC version (`+mc1.20.1`, `+mc1.21.1`, `+mc1.21.4`).
+  release jar tagged with your MC version (`.mc1.20.1`, `.mc1.21.1`, `.mc1.21.4`).
 - Fabric Loader. 0.16.x+ for 1.20.1, 0.19.x+ for 1.21.x.
 - [Fabric API](https://modrinth.com/mod/fabric-api)
 - [Cloth Config](https://modrinth.com/mod/cloth-config) (for the in-game settings UI)
