@@ -88,85 +88,31 @@ public abstract class ConnectionMixin {
                 return bootstrap.connect(address, port);
             }
             zitimc$waitForServiceCatalog(service);
-            return zitimc$dialWithRetry(bootstrap, service);
+            return bootstrap.connect(new ZitiAddress.Dial(service));
         } finally {
             ZITIMC$SERVICE.remove();
         }
     }
 
     /**
-     * The Ziti router can fail to route the first dial right after a service catalog
-     * sync ("exceeded maximum [2] retries creating circuit ... failed to establish
-     * connection with terminator"), even though the terminator is registered and
-     * healthy. A short retry catches this gracefully so the user does not have to click
-     * Join Server twice.
-     */
-    @Unique
-    private static ChannelFuture zitimc$dialWithRetry(Bootstrap bootstrap, String service) {
-        int maxAttempts = 5;
-        long perAttemptTimeoutMs = 3000L;
-        long backoffMs = 500L;
-        ChannelFuture last = null;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            ChannelFuture future = bootstrap.connect(new ZitiAddress.Dial(service));
-            boolean completed;
-            try {
-                completed = future.await(perAttemptTimeoutMs, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return future;
-            }
-            if (completed && future.isSuccess()) {
-                if (attempt > 1) {
-                    ZitiMc.LOG.info("Ziti dial '{}' succeeded on attempt {}", service, attempt);
-                }
-                return future;
-            }
-            last = future;
-            Throwable cause = future.cause();
-            ZitiMc.LOG.warn("Ziti dial '{}' attempt {}/{} failed: {}",
-                service, attempt, maxAttempts,
-                cause != null ? cause.getMessage() : "timeout");
-            try {
-                if (future.channel() != null) future.channel().close();
-            } catch (Throwable ignored) {
-                // Best-effort cleanup; if the channel can't close, the GC will handle it.
-            }
-            try {
-                Thread.sleep(backoffMs);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return future;
-            }
-        }
-        return last;
-    }
-
-    /**
-     * The Ziti SDK reports {@code Status.Active} as soon as the controller authenticates,
-     * but the initial service catalog sync arrives milliseconds later. The first dial
-     * after a fresh load therefore races and gets {@code ServiceNotAvailable}. Poll the
-     * context's catalog until the target service appears (or the deadline expires) so the
-     * first dial succeeds.
+     * Blocks until the requested service appears in the SDK's catalog or a deadline
+     * expires. Uses the SDK's own blocking {@code getService(name, timeoutMillis)} so
+     * we wait on actual catalog state rather than wall-clock polling.
+     *
+     * <p>No retry loop on the dial itself. MC's {@code Connection} handler is
+     * {@code @Sharable(false)}, so retrying the {@code Bootstrap.connect} fails on the
+     * second attempt with a pipeline exception regardless of the underlying SDK state.
+     * Far better to make the first attempt succeed by ensuring the catalog is ready.
      */
     @Unique
     private static void zitimc$waitForServiceCatalog(String service) {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (System.nanoTime() < deadline) {
-            try {
-                if (ZitiMc.zitiContext().getService(service) != null) {
-                    return;
-                }
-            } catch (Throwable ignored) {
-                // SDK can throw if catalog is mid-sync; retry until deadline.
+        try {
+            Object detail = ZitiMc.zitiContext().getService(service, 30_000L);
+            if (detail == null) {
+                ZitiMc.LOG.warn("Ziti service '{}' did not appear in the catalog within 30s; dialing anyway", service);
             }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return;
-            }
+        } catch (Throwable t) {
+            ZitiMc.LOG.warn("Ziti service '{}' lookup failed; dialing anyway: {}", service, t.getMessage());
         }
-        ZitiMc.LOG.warn("Ziti service '{}' not in catalog after 5s; dialing anyway", service);
     }
 }

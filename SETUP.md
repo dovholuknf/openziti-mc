@@ -195,6 +195,42 @@ Expected log lines on the client:
 You are now playing Minecraft over an OpenZiti overlay. No port forwarding, no public
 TCP listener, identity-authenticated by the controller.
 
+## Bonus: use a zrok share token instead of provisioning your own service
+
+If you do not want to run your own OpenZiti controller, [zrok](https://zrok.io) gives
+you the same plumbing as a hosted service. Because zrok is built on top of OpenZiti
+and a zrok share token is just an OpenZiti service name, this mod works with zrok
+share tokens without any special configuration.
+
+Host side (the player running the MC server):
+
+```
+# One-time setup with the zrok public instance (or your own zrok controller):
+zrok enable <invite-token>
+# Per-session share -- prints a share token to the console:
+zrok share private --backend-mode tcpTunnel tcp://127.0.0.1:25565
+```
+
+Keep `zrok share` running for the whole session. Take the share token it prints.
+
+Client side (each friend joining):
+
+```
+zrok enable <their-own-invite-token>
+zrok access private <share-token>
+```
+
+Then on the friend's machine:
+
+1. Copy the zrok env identity to where the mod expects it. The zrok env identity is
+   at `%USERPROFILE%\.zrok\identities\<env-name>.json`. Copy or symlink it to
+   `%APPDATA%\.minecraft\config\openziti\identity.json`.
+2. In Minecraft: Multiplayer -> Add Server -> Server Address = `<share-token>` ->
+   Done -> Join.
+
+The mod treats the share token exactly like any other OpenZiti service name -- the
+mixin chain fires and the dial goes through zrok's underlying OpenZiti session.
+
 ## Bonus: host from a client via Open to LAN
 
 You do **not** need a dedicated server jar. Every Minecraft Java client has the

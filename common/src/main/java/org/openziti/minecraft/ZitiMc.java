@@ -28,10 +28,27 @@ public final class ZitiMc {
     private ZitiMc() {}
 
     public static void init() {
+        LogSetup.attachFileAppender();
         CONFIG_HOLDER = AutoConfig.register(ZitiMcConfig.class, GsonConfigSerializer::new);
         ZitiMcConfig cfg = CONFIG_HOLDER.getConfig();
         IDENTITY = new FileIdentityProvider(Paths.get(cfg.identityPath));
-        LOG.info("ziti-minecraft init: identity provider = {}", IDENTITY.describe());
+        LOG.info("ziti-minecraft init: identity provider = {} (mod log also at logs/openziti-mc.log)", IDENTITY.describe());
+
+        // Eagerly warm the Ziti context in a daemon thread so the first dial (typically
+        // the server-list pinger right after the multiplayer screen opens) doesn't race
+        // the SDK's controller authentication + service catalog sync. Failures here
+        // are non-fatal -- if no identity is configured the actual dial path will log
+        // and fail later, but the mod itself stays loaded.
+        Thread warmUp = new Thread(() -> {
+            try {
+                zitiContext();
+                LOG.info("Ziti context warm-up complete");
+            } catch (Throwable t) {
+                LOG.warn("Ziti context warm-up failed (OK if no identity configured): {}", t.getMessage());
+            }
+        }, "ziti-warmup");
+        warmUp.setDaemon(true);
+        warmUp.start();
     }
 
     public static ZitiMcConfig config() {

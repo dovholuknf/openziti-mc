@@ -20,6 +20,11 @@ public final class ZitiServiceAddress {
         if (input == null || input.isBlank()) return false;
         if (input.contains(".") || input.contains(":")) return false;
         if (input.chars().allMatch(Character::isDigit)) return false;
+        // Reserved hostnames that are never Ziti services, even though they have no
+        // dot or colon. Without this, MC's server-list pinger spams the Ziti SDK with
+        // dial attempts on every "localhost" entry the user has saved.
+        String lower = input.toLowerCase();
+        if (lower.equals("localhost") || lower.equals("local") || lower.equals("lan")) return false;
         return true;
     }
 }
