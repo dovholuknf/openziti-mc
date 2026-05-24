@@ -47,18 +47,13 @@ public final class ZitiMcModMenu implements ModMenuApi {
             cat.addEntry(eb.startTextDescription(zitiContextStatusComponent()).build());
 
             // -- Editable settings -----------------------------------------------
-
-            cat.addEntry(eb.startStrField(
-                    Component.translatable("text.autoconfig.openziti.option.identityPath"),
-                    cfg.identityPath)
-                .setDefaultValue("config/openziti/identity.json")
-                .setTooltip(Component.translatable("text.autoconfig.openziti.option.identityPath.@Tooltip"))
-                .setSaveConsumer(v -> cfg.identityPath = v)
-                .requireRestart()
-                .build());
+            // identityPath is intentionally not exposed in the UI -- the status block
+            // above shows whether it was found, and the default path
+            // (config/openziti/identity.json) works for everyone. Power users can
+            // still override via direct edit of config/openziti.json.
 
             cat.addEntry(eb.startTextDescription(
-                Component.literal("§7Server (only needed if you host)")).build());
+                Component.literal("§7Open to OpenZiti (not necessary if you run a separate dedicated server with OpenZiti)")).build());
 
             cat.addEntry(eb.startBooleanToggle(
                     Component.translatable("text.autoconfig.openziti.option.serverEnabled"),
