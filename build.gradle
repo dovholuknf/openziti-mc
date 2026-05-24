@@ -2,7 +2,7 @@
 // fabric-loom without re-declaring it. No subprojects {} block -- each mc-* module
 // configures itself because their per-MC version pins differ.
 plugins {
-    id "fabric-loom" version "1.7-SNAPSHOT" apply false
+    id "fabric-loom" version "1.11-SNAPSHOT" apply false
     id "java"
 }
 

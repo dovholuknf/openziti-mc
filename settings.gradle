@@ -26,13 +26,13 @@ include "mc-1.21.1"
 include "mc-1.21.2"
 include "mc-1.21.3"
 include "mc-1.21.4"
-// 1.21.5+ require Loom 1.10.1+; current toolchain pins Loom 1.7.4.
-// 1.21.9-11 also hit a TagAppender type-variable error in Loom 1.7.4.
-// Module dirs remain on disk for user review.
-//include "mc-1.21.5"
-//include "mc-1.21.6"
-//include "mc-1.21.7"
-//include "mc-1.21.8"
-//include "mc-1.21.9"
-//include "mc-1.21.10"
+include "mc-1.21.5"
+include "mc-1.21.6"
+include "mc-1.21.7"
+include "mc-1.21.8"
+include "mc-1.21.9"
+include "mc-1.21.10"
+// 1.21.11 is disabled: fabric-content-registries-v0 in fabric-api 0.141.4+1.21.11
+// trips Loom 1.11.8's javadoc-intermediary-namespace check. Module dir is on disk
+// for later retry when Loom or Fabric ships a compatible combination.
 //include "mc-1.21.11"

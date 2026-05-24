@@ -39,10 +39,11 @@ candidates; the actual schedule depends on what shows up in real use.
 
 ## MC version coverage
 
-- **Bump Loom to 1.10.1+** so the 7 disabled modules (`mc-1.21.5` through
-  `mc-1.21.11`) can build. They're scaffolded on disk; settings.gradle just has
-  them commented out pending the Loom bump. Must verify no regressions on the
-  older modules after the bump.
+- **Re-enable mc-1.21.11.** v0.4.0 bumped Loom to 1.11.x and Gradle to 8.14,
+  which unblocked `mc-1.21.5` through `mc-1.21.10`. `mc-1.21.11` still trips
+  Loom's check that mods ship javadoc with an intermediary source namespace
+  -- fabric-api 0.141.4+1.21.11 doesn't. Retry when either Loom relaxes the
+  check or fabric-api ships a fixed source artifact for 1.21.11.
 
 ## Polish
 

@@ -10,17 +10,22 @@ access.
 
 ## Supported Minecraft versions
 
-Each release ships three jars, one per supported Minecraft version. Pick the one
-matching your installed MC + Fabric Loader profile:
+Each release ships one jar per supported Minecraft version (18 in v0.4.0).
+Pick the one matching your installed MC + Fabric Loader profile.
 
-| Jar                                  | Minecraft | Java |
-| ------------------------------------ | --------- | ---- |
-| `openziti-mc-<ver>.mc1.20.1.jar`     | 1.20.1    | 17   |
-| `openziti-mc-<ver>.mc1.21.1.jar`     | 1.21.1    | 21   |
-| `openziti-mc-<ver>.mc1.21.4.jar`     | 1.21.4    | 21   |
+| MC line | Versions covered                      | Java |
+| ------- | ------------------------------------- | ---- |
+| 1.20.x  | 1.20, 1.20.1, 1.20.2, 1.20.3, 1.20.4  | 17   |
+| 1.20.x  | 1.20.5, 1.20.6                        | 21   |
+| 1.21.x  | 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4  | 21   |
+| 1.21.x  | 1.21.5, 1.21.6, 1.21.7, 1.21.8        | 21   |
+| 1.21.x  | 1.21.9, 1.21.10                       | 21   |
 
-Same source compiled three times against three MC mapping sets. No feature
-differences between jars; pick by your MC version.
+Jar filename pattern: `openziti-mc-<ver>.mc<MC>.jar`. Same source compiled
+once per MC mapping set; no feature differences between jars.
+
+1.21.11 is scaffolded but deferred -- its fabric-api ships javadoc without an
+intermediary source namespace, which Loom 1.11 rejects. See [TODO.md](TODO.md).
 
 ## Install (one-shot, players)
 
