@@ -177,6 +177,15 @@ foreach ($item in $plan) {
     }
 }
 
+# Find stale OpenZiti MC jars to remove (different filename from the planned one).
+# Without this, Fabric Loader refuses to start with two jars claiming the same mod id.
+$openZitiPlan = $plan | Where-Object { $_.label -eq "OpenZiti MC" } | Select-Object -First 1
+$toRemove = @()
+if ($openZitiPlan) {
+    $toRemove = Get-ChildItem -Path $ModsDir -Filter "openziti-fabric-*.jar" -ErrorAction SilentlyContinue `
+        | Where-Object { $_.Name -ne $openZitiPlan.filename }
+}
+
 # -- Show plan + confirm -----------------------------------------------------
 
 Write-Banner "Plan"
@@ -184,8 +193,13 @@ if ($toSkip.Count -gt 0) {
     Write-Host "Already present (will skip):" -ForegroundColor Yellow
     $toSkip | ForEach-Object { Write-Host ("  {0,-22}  {1}" -f $_.label, $_.filename) }
 }
-if ($toDownload.Count -gt 0) {
+if ($toRemove.Count -gt 0) {
     if ($toSkip.Count -gt 0) { Write-Host "" }
+    Write-Host "Will remove (stale OpenZiti MC versions, prevents Fabric duplicate-mod conflict):" -ForegroundColor Yellow
+    $toRemove | ForEach-Object { Write-Host ("  {0}" -f $_.Name) }
+}
+if ($toDownload.Count -gt 0) {
+    if ($toSkip.Count -gt 0 -or $toRemove.Count -gt 0) { Write-Host "" }
     Write-Host "Will download:"
     $toDownload | ForEach-Object {
         $sizeMb = [math]::Round($_.size / 1MB, 2)
@@ -198,8 +212,8 @@ if ($toDownload.Count -gt 0) {
     Write-Host "Nothing to download -- all five jars are already in place." -ForegroundColor Green
 }
 
-if ($toDownload.Count -gt 0 -and -not $NonInteractive) {
-    $confirm = Read-Host "`nDownload to $ModsDir [Y/n]"
+if (($toDownload.Count -gt 0 -or $toRemove.Count -gt 0) -and -not $NonInteractive) {
+    $confirm = Read-Host "`nProceed with the above to $ModsDir [Y/n]"
     if ($confirm -and $confirm -notmatch '^[Yy]') {
         Write-Host "Aborted." -ForegroundColor Yellow
         return
@@ -219,6 +233,20 @@ if ($toDownload.Count -gt 0) {
         } catch {
             Write-Host "  -> FAILED: $($_.Exception.Message)" -ForegroundColor Red
             throw
+        }
+    }
+}
+
+# Remove stale OpenZiti MC versions after the new one is in place, so we never leave
+# the mods dir in a broken state if a download fails.
+if ($toRemove.Count -gt 0) {
+    Write-Banner "Removing stale versions"
+    foreach ($f in $toRemove) {
+        Write-Host "  $($f.Name)"
+        try {
+            Remove-Item -LiteralPath $f.FullName -Force
+        } catch {
+            Write-Host "  -> failed to remove $($f.Name): $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 }
@@ -268,7 +296,7 @@ if ($IdentityFile) {
 # -- Done --------------------------------------------------------------------
 
 Write-Banner "Done"
-Write-Host "$($plan.Count) jars in place at $ModsDir ($($toSkip.Count) skipped, $($toDownload.Count) downloaded)." -ForegroundColor Green
+Write-Host "$($plan.Count) jars in place at $ModsDir ($($toSkip.Count) skipped, $($toDownload.Count) downloaded, $($toRemove.Count) stale removed)." -ForegroundColor Green
 Write-Host ""
 Write-Host "Launch Minecraft, pick the Fabric 1.20.1 profile, then:"
 Write-Host "  Mods -> OpenZiti MC -> Configure  (verify identity path + service name)"
