@@ -14,9 +14,11 @@ match the exact controller objects exported from a known-good install (see
    from the controller's network plus the two endpoints.
 3. **`ziti` CLI** on your admin workstation, logged into the controller
    (`ziti edge login <controller>:1280 -u admin -p <pw>`).
-4. **Java 17** (Temurin) and Minecraft 1.20.1.
-5. The mod jar from `fabric/build/libs/openziti-fabric-<version>.jar` on both client and
-   server.
+4. **Minecraft + Java**. Pick a supported target:
+   - MC 1.20.1 needs Java 17 (Temurin recommended).
+   - MC 1.21.1 or 1.21.4 needs Java 21 (Temurin recommended).
+5. The mod jar from `mc-<version>/build/libs/openziti-mc-<ver>+mc<version>.jar` on
+   both client and server.
 
 If you do not have a controller yet, the fastest path is
 `ziti edge quickstart` (single binary, all-in-one for dev).
@@ -95,9 +97,10 @@ private key that authenticates as that identity.
 
 ## 5. Drop the identities into the mod's config dirs
 
-For dev runs via `./gradlew :fabric:runClient` and `:fabric:runServer`, working dirs are
-`run/` and `run-server/` respectively. For a real Minecraft instance, replace those with
-your launcher's instance directory.
+For dev runs via `./gradlew :mc-1.21.4:runClient` and `:mc-1.21.4:runServer`, working
+dirs are `run/` and `run-server/` respectively. Replace `mc-1.21.4` with `mc-1.21.1` or
+`mc-1.20.1` to dev against a different MC target. For a real Minecraft instance,
+replace those with your launcher's instance directory.
 
 ```powershell
 # Client side -- where the player runs MC
@@ -146,7 +149,7 @@ automatically after Save.
 
 ## 7. Dev-only: turn off Mojang auth on the server
 
-The `:fabric:runClient` task uses an offline `Player###` profile. Vanilla
+The `:mc-1.21.4:runClient` task uses an offline `Player###` profile. Vanilla
 `server.properties` defaults to `online-mode=true`, which tries to verify that player
 with Mojang and boots them. For dev testing:
 
@@ -167,7 +170,7 @@ Also accept the Mojang EULA:
 
 ```powershell
 # Window 1: dedicated server
-./gradlew :fabric:runServer
+./gradlew :mc-1.21.4:runServer
 ```
 
 Wait for these log lines:
@@ -182,7 +185,7 @@ Then in a second window:
 
 ```powershell
 # Window 2: dev client
-./gradlew :fabric:runClient
+./gradlew :mc-1.21.4:runClient
 ```
 
 In Minecraft: **Multiplayer -> Add Server**. Server Address: `openziti-mc`. Done.
@@ -222,13 +225,13 @@ attribute from step 1). Friend B's identity needs Dial permission
 | Client logs `ServiceNotAvailable`                                | First dial races the SDK's catalog sync                                                                 | Already handled by the mod's catalog-wait + 5-retry loop. If persistent, check service policies. |
 | Client logs `exceeded maximum [2] retries creating circuit`      | Edge router cannot reach the binder. Either binder is down, or no `mc-erp` / `mc-serp` policies         | Verify `ziti edge list terminators` shows your service, server log shows `Ziti listener bound` |
 | `lost connection: Disconnected` immediately after Login Start    | `online-mode=true` on the server, dev client is offline                                                 | Set `online-mode=false` for dev (see step 7)                                                  |
-| `ClassNotFoundException: org.openziti.netty.ZitiChannelFactory` at startup | Mod jar is missing the bundled Ziti SDK                                                            | Rebuild with `./gradlew :fabric:build`; production jar is at `fabric/build/libs/openziti-fabric-*.jar` |
+| `ClassNotFoundException: org.openziti.netty.ZitiChannelFactory` at startup | Mod jar is missing the bundled Ziti SDK                                                            | Rebuild with `./gradlew build`; production jars are at `mc-<version>/build/libs/openziti-mc-*+mc*.jar` |
 | Mod's `init` logs no identity path                               | `config/openziti.json` missing or unreadable                                                            | The mod writes defaults on first launch; check working dir matches the run task (`run/` vs `run-server/`) |
 | Server log shows `Closing vanilla TCP listener(s)`               | Expected behavior when **OpenZiti server enabled** is on                                                | This is the zero-trust posture. To get the TCP listener back, turn the toggle off.            |
 
 ## Finding the logs
 
-When Minecraft is launched via `:fabric:runClient`/`runServer`, log output streams to
+When Minecraft is launched via `:mc-1.21.4:runClient`/`runServer`, log output streams to
 the gradle window. When launched via a real launcher (official Mojang launcher,
 Modrinth App, Prism, MultiMC, etc.), Log4j2 writes to a file under the instance
 directory:

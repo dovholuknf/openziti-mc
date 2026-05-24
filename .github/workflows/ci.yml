@@ -13,11 +13,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # mc-1.21.x modules need Java 21. Gradle's foojay resolver downloads JDK 17
+      # for the mc-1.20.1 module on demand.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -32,9 +34,9 @@ jobs:
         shell: pwsh
         run: ./scripts/publish.ps1 -Version (Get-Content gradle.properties | Select-String '^mod_version=(.+)$').Matches[0].Groups[1].Value.Trim()
 
-      - name: Upload jar artifact
+      - name: Upload jar artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openziti-fabric-jar
-          path: fabric/build/libs/openziti-fabric-*.jar
+          name: openziti-mc-jars
+          path: mc-*/build/libs/openziti-mc-*+mc*.jar
           if-no-files-found: error

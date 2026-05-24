@@ -6,14 +6,26 @@ service and its access policies) see [SETUP.md](SETUP.md); this doc starts at "I
 player who wants to join my friend's OpenZiti-hosted server" and ends at "I'm in their
 world."
 
-Tested platform: Windows 11, Mojang launcher, MC 1.20.1 Fabric.
+Tested platform: Windows 11, Mojang launcher, Fabric.
+
+## Supported Minecraft versions
+
+Each release ships three jars, one per MC version:
+
+| MC version | Java |
+| ---------- | ---- |
+| 1.20.1     | 17   |
+| 1.21.1     | 21   |
+| 1.21.4     | 21   |
+
+Pick whichever your friend's server is on. Mismatched MC + jar will refuse to load.
 
 ## Prerequisites
 
 - Minecraft installed via the Mojang launcher (or a launcher-compatible client like
   Modrinth App / Prism / MultiMC).
-- Java 17 -- the Mojang launcher installs its own Java runtime for MC 1.20.1, so a
-  separate JDK on your PATH is not required for end-user play.
+- The Mojang launcher installs its own Java runtime per MC version, so a separate JDK
+  on your PATH is not required for end-user play.
 - The OpenZiti **service name** your friend told you to connect to.
 - An enrolled OpenZiti identity `.json` file with Dial permission for that service
   (Bind permission too if you're hosting from your own client). The person who set up
@@ -21,9 +33,9 @@ Tested platform: Windows 11, Mojang launcher, MC 1.20.1 Fabric.
 
 ## Fast path: one-shot installer script (recommended)
 
-If you'd rather not click through Modrinth to download five jars, the repo ships an
-installer script that grabs OpenZiti MC and all four required dependencies for you,
-drops them in the right folder, and (optionally) places your enrolled identity.
+If you'd rather not click through Modrinth to download four jars, the repo ships an
+installer script that grabs OpenZiti MC plus all required dependencies for you, drops
+them in the right folder, and (optionally) places your enrolled identity.
 
 After Fabric Loader is installed (Step 2 below), run this single line in PowerShell:
 
@@ -31,10 +43,11 @@ After Fabric Loader is installed (Step 2 below), run this single line in PowerSh
 iwr https://raw.githubusercontent.com/dovholuknf/openziti-mc/main/scripts/install-mods.ps1 | iex
 ```
 
-Press Enter at each prompt to accept the defaults. When it asks "Do you have an
-enrolled OpenZiti identity .json file ready?", answer `y` and paste the path to your
-identity file -- the script copies it to the right place. Then skip ahead to **Step
-4: launch and configure**.
+Press Enter at each prompt to accept the defaults. The script asks for your Minecraft
+version (1.20.1, 1.21.1, or 1.21.4) and picks the matching OpenZiti MC jar. When it
+asks "Do you have an enrolled OpenZiti identity .json file ready?", answer `y` and
+paste the path to your identity file -- the script copies it to the right place. Then
+skip ahead to **Step 4: launch and configure**.
 
 The manual steps below remain accurate; use them if you prefer to know exactly which
 jars are downloading or if you want pinned versions.
@@ -72,92 +85,66 @@ GUI.
    **Download installer (Windows)**). You get `fabric-installer-X.Y.Z.exe`.
 2. Run it. In the installer window:
    - Tab: **Client**.
-   - Minecraft version: **1.20.1** (the mod is pinned to 1.20.1; anything else will
-     refuse to load).
-   - Loader version: latest stable (0.19.x at time of writing; anything 0.16.10+ is
-     fine).
+   - Minecraft version: **the one matching your OpenZiti MC jar** (1.20.1, 1.21.1, or
+     1.21.4). Anything else will refuse to load.
+   - Loader version: latest stable. Anything 0.16.x+ for 1.20.1, 0.19.x+ for 1.21.x.
    - Install location: leave the default (auto-detects `.minecraft`).
    - Create profile: checked.
 3. Click **Install**, wait for "Successfully installed", close the installer.
 4. Verify: open the Mojang launcher, click the **Play** dropdown -- a new profile
-   `fabric-loader-1.20.1` should appear. Don't launch it yet.
+   `fabric-loader-<your-mc-version>` should appear. Don't launch it yet.
 
 ## Step 3: download and place the mod jars
 
-You need **five** jars in `%APPDATA%\.minecraft\mods\`: OpenZiti MC plus four
-dependencies. Open the mods folder in Explorer first (paste `%APPDATA%\.minecraft\mods`
-into the address bar; create the folder if it does not exist), then download each jar
-below straight into that folder.
+You need **four** jars in `%APPDATA%\.minecraft\mods\`: OpenZiti MC plus three
+dependencies (Fabric API, Cloth Config, ModMenu). Open the mods folder in Explorer
+first (paste `%APPDATA%\.minecraft\mods` into the address bar; create the folder if
+it does not exist), then download each jar below into that folder.
 
 OpenZiti MC (3a) is published on GitHub Releases and on Modrinth -- either works. The
-four dependency mods (3b through 3e) live only on Modrinth.
+three dependency mods (3b through 3d) live only on Modrinth.
+
+For each Modrinth download, **filter by your MC version** before picking a file --
+each project has separate jars per MC version.
 
 ### 3a. OpenZiti MC (the mod itself)
-
-Two sources. GitHub Releases is canonical and always available. Modrinth shows the
-same jar but lists go through moderator review after each upload, so for early
-versions the Modrinth listing may not be public yet -- if the page 404s or only shows
-"Pending review", use the GitHub path instead.
 
 Direct from GitHub Releases:
 
 1. Open https://github.com/dovholuknf/openziti-mc/releases
-2. Find the **latest** release at the top (currently v0.2.3 or higher).
-3. Under **Assets**, click `openziti-fabric-<version>.jar`. The browser downloads it.
-4. Move the downloaded file from your Downloads folder into
-   `%APPDATA%\.minecraft\mods\`.
+2. Find the **latest** release at the top.
+3. Under **Assets**, click the jar tagged with your MC version, e.g.
+   `openziti-mc-0.3.0+mc1.21.4.jar`. The browser downloads it.
+4. Move the downloaded file into `%APPDATA%\.minecraft\mods\`.
 
 Or via Modrinth:
 
 1. Open https://modrinth.com/mod/openziti-mc in a browser.
-2. Under the project title, find the row of tabs: **Description / Gallery / Changelog /
-   Versions**. Click **Versions**.
-3. The latest version is at the top of the list. Click the row to open the
-   version-detail page.
-4. On the version-detail page, click the green **Download** button at the top, or the
-   download-arrow icon next to the `openziti-fabric-<version>.jar` file in the
-   **Files** section.
-5. The browser saves the jar to your Downloads folder.
-6. Move the file from Downloads into `%APPDATA%\.minecraft\mods\`. Easiest way: open a
-   second Explorer window, paste `%APPDATA%\.minecraft\mods` into the address bar, hit
-   Enter, then drag the jar across.
+2. Click **Versions**. The list shows separate version rows per MC target.
+3. **Filter by your MC version** in the sidebar.
+4. Click the row matching your MC, then green **Download** on the version-detail
+   page. Save to `%APPDATA%\.minecraft\mods\`.
 
 ### 3b. Fabric API (required)
 
 1. Open https://modrinth.com/mod/fabric-api
 2. Click **Versions**.
-3. In the left sidebar, find the **Game versions** filter and click **1.20.1**. The
-   list narrows to 1.20.1-compatible releases.
-4. Click the top matching row (filename will look like `fabric-api-0.92.5+1.20.1.jar`
-   or similar -- pick the highest-numbered one).
-5. Click the green **Download** button on the version detail page.
-6. Move the file into `%APPDATA%\.minecraft\mods\`.
+3. Sidebar -> **Game versions** -> click your MC version.
+4. Click the top matching row, then **Download** -> move into `mods\`.
 
-### 3c. Architectury API (required)
-
-1. Open https://modrinth.com/mod/architectury-api
-2. Click **Versions**.
-3. Sidebar -> **Game versions** -> click **1.20.1**.
-4. Sidebar -> **Loaders** -> click **Fabric**. (Architectury also publishes NeoForge
-   builds; we explicitly want the Fabric one.)
-5. Click the top matching row (around `architectury-9.2.x-fabric.jar`).
-6. Click **Download** -> move into `mods\`.
-
-### 3d. Cloth Config (required -- powers the in-game settings screen)
+### 3c. Cloth Config (required -- powers the in-game settings screen)
 
 1. Open https://modrinth.com/mod/cloth-config
 2. Click **Versions**.
-3. Sidebar filters: **Game versions** -> **1.20.1**, **Loaders** -> **Fabric**.
-4. Click the top matching row (around `cloth-config-11.1.x-fabric.jar`).
-5. **Download** -> move into `mods\`.
+3. Sidebar filters: **Game versions** -> your MC version, **Loaders** -> **Fabric**.
+4. Click the top matching row, then **Download** -> move into `mods\`.
 
-### 3e. ModMenu (recommended -- surfaces the Configure button in the in-game mod list)
+### 3d. ModMenu (recommended -- surfaces the Configure button in the in-game mod list)
 
 1. Open https://modrinth.com/mod/modmenu
 2. Click **Versions**.
-3. Sidebar -> **Game versions** -> click **1.20.1**.
-4. Click the top matching row (around `modmenu-7.2.x.jar`).
-5. **Download** -> move into `mods\`.
+3. Sidebar -> **Game versions** -> click your MC version.
+4. Click the top matching row, then **Download** -> move into `mods\`.
 
 ### Verify
 
@@ -165,19 +152,17 @@ Or via Modrinth:
 ls $env:APPDATA\.minecraft\mods | Select-Object Name, Length
 ```
 
-You should see five jars. Approximate sizes for a sanity check:
+You should see four jars. Approximate sizes for sanity:
 
-| Jar                              | Size  |
-| -------------------------------- | ----- |
-| `openziti-fabric-0.2.0.jar`      | ~28 MB |
-| `fabric-api-0.92.X+1.20.1.jar`   | ~2 MB  |
-| `architectury-9.2.X-fabric.jar`  | ~700 KB |
-| `cloth-config-11.1.X-fabric.jar` | ~1 MB  |
-| `modmenu-7.2.X.jar`              | ~750 KB |
+| Jar prefix             | Size       |
+| ---------------------- | ---------- |
+| `openziti-mc-*.jar`    | ~28-30 MB  |
+| `fabric-api-*.jar`     | ~1-2 MB    |
+| `cloth-config-*.jar`   | ~1 MB      |
+| `modmenu-*.jar`        | ~750 KB    |
 
-If a jar is missing or the OpenZiti MC one is < 5 MB, something went wrong (the small
-"sources" jar or "dev-shadow" jar can land instead of the proper one). Re-download the
-file matching the expected size.
+If the OpenZiti MC jar is under 5 MB you grabbed the `-sources.jar` or
+`-dev-shadow.jar` by mistake. Re-download the unsuffixed version.
 
 ## Step 4: place your identity file
 
@@ -203,7 +188,7 @@ The file should be 6-15 KB (a Ziti identity .json).
 
 1. Open the Mojang launcher.
 2. Click the **Play** dropdown next to the green button and pick the
-   **fabric-loader-1.20.1** profile.
+   **fabric-loader-<your-mc-version>** profile.
 3. Click **Play**. Minecraft launches; first launch with new mods takes a bit longer
    while Fabric resolves dependencies.
 4. On the main menu, click **Mods** (a button added by ModMenu).
@@ -236,10 +221,10 @@ are the first two places to look.
 
 ## Common problems
 
-| Symptom                                                  | Fix                                                                                            |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| MC won't launch -- "Incompatible mods" screen on startup | Wrong Fabric Loader version. Re-run the Fabric installer and pick 1.20.1; loader 0.16.10+.     |
-| "Identity file: NOT FOUND" in Configure                  | The `.json` isn't at `config\openziti\identity.json` under the instance dir. Redo Step 4.       |
-| Connect fails immediately, "Couldn't connect"            | Service name mismatch, or your identity doesn't have Dial permission. Confirm with the host.   |
-| Connect takes ~30 seconds then fails on first attempt    | SDK catalog warmup. Click Join again -- the second attempt usually succeeds.                   |
-| Connect succeeds then drops within seconds               | Host's `server.properties` has `online-mode=true`; ask host to set it false for dev testing.   |
+| Symptom                                                  | Fix                                                                                                                                |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| MC won't launch -- "Incompatible mods" screen on startup | Wrong jar for your MC version. Confirm the jar filename ends `+mc<version>.jar` matching your Fabric profile.                      |
+| "Identity file: NOT FOUND" in Configure                  | The `.json` isn't at `config\openziti\identity.json` under the instance dir. Redo Step 4.                                          |
+| Connect fails immediately, "Couldn't connect"            | Service name mismatch, or your identity doesn't have Dial permission. Confirm with the host.                                       |
+| Connect takes ~30 seconds then fails on first attempt    | SDK catalog warmup. Click Join again -- the second attempt usually succeeds.                                                       |
+| Connect succeeds then drops within seconds               | Host's `server.properties` has `online-mode=true`; ask host to set it false for dev testing.                                       |

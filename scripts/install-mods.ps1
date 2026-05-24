@@ -12,14 +12,17 @@
     Sources:
       OpenZiti MC      -- GitHub Releases (https://github.com/dovholuknf/openziti-mc)
       Fabric API       -- Modrinth
-      Architectury API -- Modrinth
       Cloth Config     -- Modrinth
       ModMenu          -- Modrinth
 
     No Modrinth account or token required -- the public REST API is used.
 
+    OpenZiti MC ships one jar per supported Minecraft version. The installer picks
+    the jar tagged "+mc{MinecraftVersion}" from the GitHub release assets.
+
 .PARAMETER MinecraftVersion
-    Minecraft version. Default 1.20.1.
+    Minecraft version. Must be one of the targets a release was built for
+    (currently 1.20.1, 1.21.1, or 1.21.4). Default 1.20.1.
 
 .PARAMETER ModsDir
     Target mods directory. Default %APPDATA%\.minecraft\mods (Mojang launcher default).
@@ -111,12 +114,19 @@ try {
         "https://api.github.com/repos/dovholuknf/openziti-mc/releases/latest"
     }
     $ghRelease = Invoke-RestMethod -Uri $url -UseBasicParsing
+    # Asset names: openziti-mc-{version}+mc{minecraftVersion}.jar (post-v0.3.0).
+    # Pre-v0.3.0 releases (v0.2.x) used openziti-fabric-*.jar and were 1.20.1-only,
+    # so we only accept those when MC=1.20.1 to avoid serving an incompatible jar.
+    $assetMatch    = "openziti-mc-*+mc${MinecraftVersion}.jar"
+    $legacyMatch   = if ($MinecraftVersion -eq "1.20.1") { "openziti-fabric-*.jar" } else { $null }
     $asset = $ghRelease.assets `
-        | Where-Object { $_.name -like "openziti-fabric-*.jar" `
+        | Where-Object { ($_.name -like $assetMatch -or ($legacyMatch -and $_.name -like $legacyMatch)) `
                           -and $_.name -notlike "*-sources.jar" `
                           -and $_.name -notlike "*-dev-shadow.jar" } `
         | Select-Object -First 1
-    if (-not $asset) { throw "No openziti-fabric-*.jar asset in release $($ghRelease.tag_name)." }
+    if (-not $asset) {
+        throw "No OpenZiti MC jar for MC $MinecraftVersion in release $($ghRelease.tag_name). Tried filename patterns: '$assetMatch'$(if ($legacyMatch) { ", '$legacyMatch'" })."
+    }
     $plan += [PSCustomObject]@{
         source   = "GitHub"
         label    = "OpenZiti MC"
@@ -129,12 +139,11 @@ try {
     throw
 }
 
-# Modrinth dependencies.
+# Modrinth dependencies. Architectury is gone (v0.3.0 dropped it: Fabric-only now).
 $modrinthMods = @(
-    @{ slug = "fabric-api";        label = "Fabric API" }
-    @{ slug = "architectury-api";  label = "Architectury API" }
-    @{ slug = "cloth-config";      label = "Cloth Config" }
-    @{ slug = "modmenu";           label = "ModMenu" }
+    @{ slug = "fabric-api";   label = "Fabric API" }
+    @{ slug = "cloth-config"; label = "Cloth Config" }
+    @{ slug = "modmenu";      label = "ModMenu" }
 )
 $gv = [Uri]::EscapeDataString("[`"$MinecraftVersion`"]")
 $ld = [Uri]::EscapeDataString("[`"fabric`"]")
@@ -179,11 +188,13 @@ foreach ($item in $plan) {
 
 # Find stale OpenZiti MC jars to remove (different filename from the planned one).
 # Without this, Fabric Loader refuses to start with two jars claiming the same mod id.
+# Sweep both the new openziti-mc-* naming and the legacy openziti-fabric-* (pre-v0.3.0).
 $openZitiPlan = $plan | Where-Object { $_.label -eq "OpenZiti MC" } | Select-Object -First 1
 $toRemove = @()
 if ($openZitiPlan) {
-    $toRemove = Get-ChildItem -Path $ModsDir -Filter "openziti-fabric-*.jar" -ErrorAction SilentlyContinue `
-        | Where-Object { $_.Name -ne $openZitiPlan.filename }
+    $toRemove = Get-ChildItem -Path $ModsDir -ErrorAction SilentlyContinue `
+        | Where-Object { ($_.Name -like "openziti-mc-*.jar" -or $_.Name -like "openziti-fabric-*.jar") `
+                          -and $_.Name -ne $openZitiPlan.filename }
 }
 
 # -- Show plan + confirm -----------------------------------------------------
@@ -304,7 +315,7 @@ if ($IdentityFile) {
 Write-Banner "Done"
 Write-Host "$($plan.Count) jars in place at $ModsDir ($($toSkip.Count) skipped, $($toDownload.Count) downloaded, $($toRemove.Count) stale removed)." -ForegroundColor Green
 Write-Host ""
-Write-Host "Launch Minecraft, pick the Fabric 1.20.1 profile, then:"
+Write-Host "Launch Minecraft, pick the Fabric $MinecraftVersion profile, then:"
 Write-Host "  Mods -> OpenZiti MC -> Configure  (verify identity path + service name)"
 Write-Host "  Multiplayer -> Add Server -> type the OpenZiti service name -> Done -> Join"
 Write-Host ""

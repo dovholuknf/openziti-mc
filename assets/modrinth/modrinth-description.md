@@ -22,10 +22,12 @@ are done.
 
 ## Requirements
 
-- Java Edition 1.20.1
-- Fabric Loader 0.16.10+
+- Java Edition 1.20.1 (Java 17), 1.21.1 (Java 21), or 1.21.4 (Java 21). Pick the
+  release jar tagged with your MC version (`+mc1.20.1`, `+mc1.21.1`, `+mc1.21.4`).
+- Fabric Loader. 0.16.x+ for 1.20.1, 0.19.x+ for 1.21.x.
 - [Fabric API](https://modrinth.com/mod/fabric-api)
-- [Architectury API](https://modrinth.com/mod/architectury-api)
+- [Cloth Config](https://modrinth.com/mod/cloth-config) (for the in-game settings UI)
+- [ModMenu](https://modrinth.com/mod/modmenu) (recommended -- surfaces the Configure button)
 - A running OpenZiti controller and at least one edge router. If you don't have an OpenZiti overlay,
   [set one up by following a get-started guide](https://netfoundry.io/docs/openziti/get-started/network/).
 
@@ -63,21 +65,22 @@ After starting Minecraft, choose: Multiplayer -> Add Server -> Server Address `o
 ## Additional Information
 
 For additional information or more details see the project's main page on GitHub at
-https://github.com/dovholuknf/ziti-minecraft. There you'll find a full step-by-step (controller + identities +
-policies + dev runs) guide as well in [the SETUP.md](https://github.com/dovholuknf/ziti-minecraft/blob/main/SETUP.md).
+https://github.com/dovholuknf/openziti-mc. There you'll find a full step-by-step (controller + identities +
+policies + dev runs) guide as well in [the SETUP.md](https://github.com/dovholuknf/openziti-mc/blob/main/SETUP.md).
 
 ## Limitations
 
-- This release targets MC 1.20.1 only. NeoForge support is planned for a future MC bump.
-- The OpenZiti SDK and Kotlin standard library are bundled, so the jar is around 28 MB. Larger than most utility mods,
-  smaller than most content mods.
+- Fabric only. NeoForge / Forge are not supported.
+- One jar per MC version -- if you're between target versions (e.g. 1.20.4), there is no compatible build.
+- The OpenZiti SDK and Kotlin standard library are bundled, so each jar is around 28-30 MB. Larger than most utility
+  mods, smaller than most content mods.
 - Annotation-processor warnings about Netty mapping targets are cosmetic; they do not affect runtime behavior.
 
 ## Architecture
 
 For a technical deep-dive (Netty channel-factory hook, the smuggler `InetSocketAddress` pattern, the three Mixin
 classes, the `ZitiContext` warmup wait, the dial-retry loop) see
-[BLOG.md](https://github.com/dovholuknf/ziti-minecraft/blob/main/BLOG.md) in the repo.
+[BLOG.md](https://github.com/dovholuknf/openziti-mc/blob/main/BLOG.md) in the repo.
 
 ## Credits
 
@@ -86,4 +89,4 @@ classes, the `ZitiContext` warmup wait, the dial-retry loop) see
 - [vgskye/e4mc-minecraft-architectury](https://github.com/vgskye/e4mc-minecraft-architectury) -- the
   smuggler-InetSocketAddress pattern and the Mixin shapes for `Connection` / `ServerConnectionListener`.
 
-Apache-2.0 licensed. Source at [github.com/dovholuknf/ziti-minecraft](https://github.com/dovholuknf/ziti-minecraft).
+Apache-2.0 licensed. Source at [github.com/dovholuknf/openziti-mc](https://github.com/dovholuknf/openziti-mc).

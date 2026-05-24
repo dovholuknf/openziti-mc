@@ -30,14 +30,13 @@
     "${mod_id}.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.16.10",
+    "fabricloader": ">=0.16.0",
     "fabric-api": "*",
-    "architectury": ">=9.0.0",
-    "cloth-config": ">=11.0.0",
+    "cloth-config": ">=15.0.0",
     "minecraft": "~${minecraft_version}",
     "java": ">=${java_version}"
   },
   "recommends": {
-    "modmenu": ">=7.0.0"
+    "modmenu": ">=11.0.0"
   }
 }

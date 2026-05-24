@@ -119,9 +119,6 @@ public final class ZitiMcModMenu implements ModMenuApi {
         } else if (status instanceof ZitiContext.Status.Disabled) {
             label = "Disabled";
             color = "§c";
-        } else if (status instanceof ZitiContext.Status.Impaired) {
-            label = "Impaired";
-            color = "§c";
         } else {
             label = status.getClass().getSimpleName();
             color = "§7";

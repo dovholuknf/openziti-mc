@@ -16,10 +16,10 @@ This document captures the v1 architecture. Status: draft, written 2026-05-22.
    service so authorized identities are the only entities able to reach it.
 3. Identity setup is a one-time, file-based step in v1. The identity-loading layer is an
    interface so a future zrok loader can drop in without touching the network code.
-4. Ship for Fabric on MC 1.20.1. The codebase is laid out as an Architectury
-   multiloader so a second loader module can be added later without restructuring;
-   NeoForge is deferred until we bump the MC target to 1.20.4+ where Loom's
-   `neoForge()` integration is clean.
+4. Ship for Fabric on MC 1.20.1, 1.21.1, and 1.21.4. The codebase is laid out as one
+   shared `common/` source folder pulled into per-MC-version Loom modules, so the
+   same source compiles three times against three MC mapping sets. NeoForge / Forge
+   are not currently supported.
 
 ## Non-goals (v1)
 
@@ -49,19 +49,30 @@ We do not implement a tunnel. We replace Minecraft's Netty channel factory and s
 address at well-defined Mixin points so the rest of Minecraft sees a normal Netty
 channel that just happens to be backed by Ziti instead of a raw TCP socket.
 
-## Module layout (Architectury)
+## Module layout
 
 ```
 ziti-minecraft/
-  common/      -- loader-agnostic code: Ziti integration, identity, address parsing,
-                  config, Mixin classes targeting Mojmap-named MC classes.
-  fabric/      -- Fabric entrypoints (ModInitializer / ClientModInitializer),
-                  fabric.mod.json, fabric-side mixin registration.
-  (neoforge/)  -- planned for the post-1.20.4 bump.
+  common/      -- ALL Java source: Ziti integration, identity, address parsing,
+                  config, Fabric ModInitializer entrypoints, Mixin classes targeting
+                  Mojmap-named MC classes. Not a Gradle subproject.
+  mc-1.20.1/   -- per-MC-version Loom build (Java 17, Fabric Loader 0.16+,
+                  Cloth 11, ModMenu 7, Ziti SDK 0.28.1).
+  mc-1.21.1/   -- per-MC-version Loom build (Java 21, Cloth 15, ModMenu 11,
+                  Ziti SDK 0.33.1).
+  mc-1.21.4/   -- per-MC-version Loom build (Java 21, Cloth 17, ModMenu 13,
+                  Ziti SDK 0.33.1).
 ```
 
-Common code is compiled against Mojmap-named Minecraft. Each loader module applies the
-common code plus its own glue.
+Each `mc-X.Y.Z/build.gradle` declares `sourceSets.main.java.srcDir
+"${rootDir}/common/src/main/java"` so Loom compiles common's source against that
+module's MC mappings. There is no per-version Java source duplication; the principle
+is "code in common unless the compiler forces a split." All Mixin targets so far
+(`Connection`, `ServerConnectionListener`, Netty `Bootstrap`) are stable across the
+three MC versions, so no splits exist today.
+
+Dropping Architectury (which was load-bearing only for multi-loader Fabric+NeoForge)
+let us go to plain `fabric-loom` directly with cleaner per-module configuration.
 
 ## Key types
 
@@ -131,18 +142,18 @@ Config file: `config/openziti.json`, schema (as shipped):
   simplification -- the implicit heuristic with a `localhost`/`local`/`lan`
   deny-list is the only mode now.
 
-## Loader differences worth flagging
+## MC-version differences worth flagging
 
-- **Fabric** uses `fabric.mod.json` and Mixin registration via `fabric.mod.json` ->
-  `mixins`. Entrypoints: `main` for server-safe init, `client` for client-only init.
-- **NeoForge 1.20.1** still uses legacy Forge `mods.toml` and bus-event subscription.
-  Mixin registration is via `MixinExtrasBootstrap`-equivalent + a service file
-  (NeoForge supports the same `mixins.json` config; loader hooks `MixinBootstrap` for
-  us).
+- **1.20.1** is Java 17 and pins the Ziti SDK at 0.28.1 (0.29+ targets Java 21 only).
+  Cloth Config 11.x, ModMenu 7.x.
+- **1.21.1** is Java 21 with the broader 1.21 modding audience baseline. Cloth Config
+  15.x, ModMenu 11.x. Ziti SDK 0.33.1.
+- **1.21.4** is Java 21 with the newest Cloth Config 17.x and ModMenu 13.x. Ziti SDK
+  0.33.1.
 
-Both loaders pull from `common/` via Architectury Loom's `transformDevelopmentFabric` /
-`transformDevelopmentNeoForge` tasks. We compile common Mixins against MC and remap on
-build per loader.
+All three pull from `common/` via a Gradle source-set extension. `fabric.mod.json`
+lives per-module because the MC version pin and dependency floors differ; the source
+files (Java + `openziti.mixins.json`) come from `common/` unchanged.
 
 ## Failure modes and what we do
 

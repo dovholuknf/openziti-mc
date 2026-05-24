@@ -1,9 +1,6 @@
 pluginManagement {
     repositories {
         maven { url "https://maven.fabricmc.net/" }
-        maven { url "https://maven.architectury.dev/" }
-        maven { url "https://maven.minecraftforge.net/" }
-        maven { url "https://maven.neoforged.net/releases/" }
         gradlePluginPortal()
     }
 }
@@ -14,5 +11,9 @@ plugins {
 
 rootProject.name = "ziti-minecraft"
 
-include "common"
-include "fabric"
+// Each include is one MC-version-targeted Fabric jar. The common source lives at
+// /common/src/main/java and is pulled into each mc-* module's main source set, so
+// the same code compiles three times against three different MC mapping JARs.
+include "mc-1.20.1"
+include "mc-1.21.1"
+include "mc-1.21.4"

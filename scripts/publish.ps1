@@ -1,64 +1,54 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds the ziti-minecraft Fabric jar and publishes a release.
+    Builds and publishes a multi-MC-version OpenZiti MC release.
 
 .DESCRIPTION
-    Self-contained release pipeline. Uploads to Modrinth via its REST API and creates a
-    GitHub Release with the jar attached. Either upload can be skipped by omitting the
-    matching token, which is useful for dry-runs.
+    Self-contained release pipeline. Builds one jar per supported Minecraft version
+    (mc-1.20.1, mc-1.21.1, mc-1.21.4), then:
+      - creates ONE GitHub Release with all three jars attached.
+      - creates ONE Modrinth version PER MC target, each tagged with that single
+        MC version (Modrinth filters by game_versions, so a separate version per
+        target is the standard pattern).
 
-    Runs identically from a developer workstation and from GitHub Actions; the workflow
-    only checks out code, sets up the JDK, and invokes this script with secrets passed
-    as parameters.
+    Runs identically from a developer workstation and from GitHub Actions.
 
 .PARAMETER Version
-    Semantic version for this release, e.g. "0.1.0". Must match the gradle.properties
-    `mod_version` so the built jar's filename lines up. The script verifies this.
+    Semantic version for this release, e.g. "0.3.0". Must match gradle.properties
+    mod_version.
 
 .PARAMETER SkipBuild
-    Skip `./gradlew :fabric:build`. Use when the jar is already built and you just want
-    to re-upload.
+    Skip the gradle build (jars must already exist under each module's build/libs).
 
 .PARAMETER ModrinthToken
-    Modrinth API token (https://modrinth.com/settings/account). Pass empty string to
-    skip Modrinth upload.
+    Modrinth API token. Empty = skip Modrinth.
 
 .PARAMETER ModrinthProjectId
-    Modrinth project ID (the short slug or the long ID from the project URL). Required
-    if ModrinthToken is provided.
+    Modrinth slug or short ID. Required when ModrinthToken is set.
 
 .PARAMETER GitHubToken
-    GitHub token with `contents: write` permission. In GH Actions this is the
-    automatically-provided GITHUB_TOKEN. Pass empty string to skip the GitHub Release.
+    GitHub token with contents: write. In Actions this is the auto-provided
+    GITHUB_TOKEN. Empty = skip GitHub Release.
 
 .PARAMETER GitHubRepo
-    Repo in `owner/name` form, e.g. `dovholuknf/openziti-mc`. Required if
-    GitHubToken is provided.
+    "owner/name", e.g. dovholuknf/openziti-mc. Required when GitHubToken is set.
 
 .PARAMETER Changelog
-    Release notes / changelog text. Used for both Modrinth and GitHub Release bodies.
-    Defaults to a placeholder.
-
-.PARAMETER GameVersions
-    MC versions this release is compatible with. Modrinth metadata.
-
-.PARAMETER Loaders
-    Mod loaders this release targets. Modrinth metadata.
+    Release notes body. Used for both Modrinth and GitHub Release.
 
 .PARAMETER VersionType
     "release", "beta", or "alpha". Modrinth metadata.
 
 .EXAMPLE
-    # Dry run: build only, no uploads.
-    .\scripts\publish.ps1 -Version 0.1.0
+    # Dry run -- build everything, no uploads.
+    .\scripts\publish.ps1 -Version 0.3.0
 
 .EXAMPLE
     # Full release.
-    .\scripts\publish.ps1 -Version 0.1.0 `
-        -ModrinthToken $env:MODRINTH_TOKEN -ModrinthProjectId zitimc `
+    .\scripts\publish.ps1 -Version 0.3.0 `
+        -ModrinthToken $env:MODRINTH_TOKEN -ModrinthProjectId openziti-mc `
         -GitHubToken $env:GITHUB_TOKEN -GitHubRepo dovholuknf/openziti-mc `
-        -Changelog "First public release. Routes Minecraft over OpenZiti."
+        -Changelog "Multi-version release: 1.20.1, 1.21.1, 1.21.4."
 #>
 
 [CmdletBinding()]
@@ -70,8 +60,6 @@ param(
     [string]                          $GitHubToken       = "",
     [string]                          $GitHubRepo        = "",
     [string]                          $Changelog         = "See repository for release notes.",
-    [string[]]                        $GameVersions      = @("1.20.1"),
-    [string[]]                        $Loaders           = @("fabric"),
     [ValidateSet("release","beta","alpha")]
     [string]                          $VersionType       = "release"
 )
@@ -83,34 +71,51 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
 
 # -------------------------------------------------------------------------
-# 1. Sanity: the requested version must match the version in gradle.properties.
+# Layout: the modules we ship a jar for. Add a new MC version by adding a row.
 # -------------------------------------------------------------------------
 
-$gradleProps     = Get-Content (Join-Path $repoRoot "gradle.properties")
-$gradleVersion   = ($gradleProps | Select-String '^mod_version=(.+)$').Matches[0].Groups[1].Value.Trim()
+$targets = @(
+    [PSCustomObject]@{ module = "mc-1.20.1"; mc = "1.20.1" }
+    [PSCustomObject]@{ module = "mc-1.21.1"; mc = "1.21.1" }
+    [PSCustomObject]@{ module = "mc-1.21.4"; mc = "1.21.4" }
+)
+
+# -------------------------------------------------------------------------
+# 1. Sanity: requested version must match gradle.properties mod_version.
+# -------------------------------------------------------------------------
+
+$gradleProps   = Get-Content (Join-Path $repoRoot "gradle.properties")
+$gradleVersion = ($gradleProps | Select-String '^mod_version=(.+)$').Matches[0].Groups[1].Value.Trim()
 if ($gradleVersion -ne $Version) {
     throw "Requested version '$Version' does not match gradle.properties mod_version '$gradleVersion'. Bump gradle.properties first."
 }
 
 # -------------------------------------------------------------------------
-# 2. Build (unless skipped).
+# 2. Build all modules in one shot.
 # -------------------------------------------------------------------------
 
 if (-not $SkipBuild) {
-    Write-Host "Building :fabric:build ..."
-    & ./gradlew :fabric:build --no-daemon
+    Write-Host "Building all modules ..."
+    & ./gradlew build --no-daemon
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed (exit $LASTEXITCODE)." }
 }
 
-$jarPath = Join-Path $repoRoot "fabric/build/libs/openziti-fabric-$Version.jar"
-if (-not (Test-Path $jarPath)) {
-    throw "Built jar not found at $jarPath. Did the build succeed?"
+# Resolve the produced jar for each target.
+foreach ($t in $targets) {
+    $jarName = "openziti-mc-$Version+mc$($t.mc).jar"
+    $jarPath = Join-Path $repoRoot "$($t.module)/build/libs/$jarName"
+    if (-not (Test-Path $jarPath)) {
+        throw "Built jar not found at $jarPath. Did :$($t.module):build succeed?"
+    }
+    $jar = Get-Item $jarPath
+    Add-Member -InputObject $t -NotePropertyName jarPath -NotePropertyValue $jar.FullName
+    Add-Member -InputObject $t -NotePropertyName jarName -NotePropertyValue $jar.Name
+    Add-Member -InputObject $t -NotePropertyName jarSize -NotePropertyValue $jar.Length
+    Write-Host ("  {0,-10}  {1,7:F2} MB  {2}" -f $t.mc, ($jar.Length / 1MB), $jar.Name)
 }
-$jarFile = Get-Item $jarPath
-Write-Host "Jar: $($jarFile.FullName) ($([math]::Round($jarFile.Length / 1MB, 2)) MB)"
 
 # -------------------------------------------------------------------------
-# 3. Modrinth upload.
+# 3. Modrinth uploads -- one version per MC target.
 # -------------------------------------------------------------------------
 
 if ($ModrinthToken) {
@@ -121,90 +126,76 @@ if ($ModrinthToken) {
         "User-Agent"  = "dovholuknf/openziti-mc publish.ps1"
     }
 
-    # Modrinth's /v2/version API wants the project's base62 short ID, not the slug.
-    # Resolve via /v2/project/{slug-or-id} which accepts either and returns the canonical id.
     Write-Host "Resolving Modrinth project '$ModrinthProjectId' ..."
     try {
-        $projectInfo = Invoke-RestMethod -Method Get -Uri "https://api.modrinth.com/v2/project/$ModrinthProjectId" -Headers $modrinthHeaders
+        $projectInfo       = Invoke-RestMethod -Method Get -Uri "https://api.modrinth.com/v2/project/$ModrinthProjectId" -Headers $modrinthHeaders
         $resolvedProjectId = $projectInfo.id
         Write-Host "  -> ID: $resolvedProjectId (slug: $($projectInfo.slug))"
-    }
-    catch {
+    } catch {
         $errBody = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { "" }
         throw "Failed to look up Modrinth project '$ModrinthProjectId': $($_.Exception.Message)`n$errBody"
     }
 
-    Write-Host "Uploading to Modrinth (project=$resolvedProjectId, version=$Version) ..."
+    foreach ($t in $targets) {
+        $modrinthVersion = "$Version+mc$($t.mc)"
+        Write-Host "Uploading to Modrinth: $modrinthVersion (mc=$($t.mc)) ..."
 
-    $metadata = @{
-        name           = "ziti-minecraft $Version"
-        version_number = $Version
-        version_type   = $VersionType
-        loaders        = $Loaders
-        game_versions  = $GameVersions
-        featured       = $false
-        dependencies   = @(
-            @{ project_id = "P7dR8mSH"; dependency_type = "required" }   # Fabric API
-            @{ project_id = "lhGA9TYQ"; dependency_type = "required" }   # Architectury API
-        )
-        project_id     = $resolvedProjectId
-        file_parts     = @("file_0")
-        primary_file   = "file_0"
-        changelog      = $Changelog
-    } | ConvertTo-Json -Depth 5 -Compress
+        $metadata = @{
+            name           = "OpenZiti MC $modrinthVersion"
+            version_number = $modrinthVersion
+            version_type   = $VersionType
+            loaders        = @("fabric")
+            game_versions  = @($t.mc)
+            featured       = $false
+            dependencies   = @(
+                @{ project_id = "P7dR8mSH"; dependency_type = "required" }   # Fabric API
+            )
+            project_id     = $resolvedProjectId
+            file_parts     = @("file_0")
+            primary_file   = "file_0"
+            changelog      = $Changelog
+        } | ConvertTo-Json -Depth 5 -Compress
 
-    $boundary  = [System.Guid]::NewGuid().ToString("N")
-    $lf        = "`r`n"
-    $jarBytes  = [System.IO.File]::ReadAllBytes($jarPath)
-    $enc       = [System.Text.Encoding]::UTF8
+        $boundary  = [System.Guid]::NewGuid().ToString("N")
+        $lf        = "`r`n"
+        $jarBytes  = [System.IO.File]::ReadAllBytes($t.jarPath)
+        $enc       = [System.Text.Encoding]::UTF8
 
-    $bodyStream = New-Object System.IO.MemoryStream
-    $bw         = New-Object System.IO.BinaryWriter($bodyStream)
+        $bodyStream = New-Object System.IO.MemoryStream
+        $bw         = New-Object System.IO.BinaryWriter($bodyStream)
 
-    function Append-StringPart {
-        param($writer, $boundary, $name, $value)
         $part  = "--$boundary$lf"
-        $part += "Content-Disposition: form-data; name=`"$name`"$lf$lf"
-        $part += "$value$lf"
-        $writer.Write($enc.GetBytes($part))
-    }
+        $part += "Content-Disposition: form-data; name=`"data`"$lf$lf"
+        $part += "$metadata$lf"
+        $bw.Write($enc.GetBytes($part))
 
-    function Append-FilePart {
-        param($writer, $boundary, $name, $filename, $bytes)
         $header  = "--$boundary$lf"
-        $header += "Content-Disposition: form-data; name=`"$name`"; filename=`"$filename`"$lf"
+        $header += "Content-Disposition: form-data; name=`"file_0`"; filename=`"$($t.jarName)`"$lf"
         $header += "Content-Type: application/java-archive$lf$lf"
-        $writer.Write($enc.GetBytes($header))
-        $writer.Write($bytes)
-        $writer.Write($enc.GetBytes($lf))
-    }
+        $bw.Write($enc.GetBytes($header))
+        $bw.Write($jarBytes)
+        $bw.Write($enc.GetBytes($lf))
+        $bw.Write($enc.GetBytes("--$boundary--$lf"))
+        $bw.Flush()
+        $bodyBytes = $bodyStream.ToArray()
 
-    Append-StringPart $bw $boundary "data"   $metadata
-    Append-FilePart   $bw $boundary "file_0" $jarFile.Name $jarBytes
-    $bw.Write($enc.GetBytes("--$boundary--$lf"))
-    $bw.Flush()
-    $bodyBytes = $bodyStream.ToArray()
-
-    try {
-        $resp = Invoke-RestMethod -Method Post -Uri "https://api.modrinth.com/v2/version" `
-            -Headers $modrinthHeaders -ContentType "multipart/form-data; boundary=$boundary" `
-            -Body $bodyBytes
-        Write-Host "  -> Modrinth version id: $($resp.id)"
-        Write-Host "  -> https://modrinth.com/mod/$($projectInfo.slug)/version/$($resp.version_number)"
+        try {
+            $resp = Invoke-RestMethod -Method Post -Uri "https://api.modrinth.com/v2/version" `
+                -Headers $modrinthHeaders -ContentType "multipart/form-data; boundary=$boundary" `
+                -Body $bodyBytes
+            Write-Host "  -> Modrinth version id: $($resp.id)"
+            Write-Host "  -> https://modrinth.com/mod/$($projectInfo.slug)/version/$($resp.version_number)"
+        } catch {
+            $errBody = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { "" }
+            throw "Modrinth upload failed for $modrinthVersion : $($_.Exception.Message)`n$errBody"
+        }
     }
-    catch {
-        # PS 7+: response body lives on ErrorDetails.Message
-        # PS 5.1: also has ErrorDetails.Message for Invoke-RestMethod failures
-        $errBody = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { "" }
-        throw "Modrinth upload failed: $($_.Exception.Message)`n$errBody"
-    }
-}
-else {
+} else {
     Write-Host "Modrinth upload skipped (no token)."
 }
 
 # -------------------------------------------------------------------------
-# 4. GitHub Release.
+# 4. GitHub Release -- one release with all three jars attached.
 # -------------------------------------------------------------------------
 
 if ($GitHubToken) {
@@ -214,10 +205,10 @@ if ($GitHubToken) {
     Write-Host "Creating GitHub Release $tag in $GitHubRepo ..."
 
     $createBody = @{
-        tag_name = $tag
-        name     = $tag
-        body     = $Changelog
-        draft    = $false
+        tag_name   = $tag
+        name       = $tag
+        body       = $Changelog
+        draft      = $false
         prerelease = ($VersionType -ne "release")
     } | ConvertTo-Json -Compress
 
@@ -232,28 +223,28 @@ if ($GitHubToken) {
         $release = Invoke-RestMethod -Method Post `
             -Uri "https://api.github.com/repos/$GitHubRepo/releases" `
             -Headers $ghHeaders -ContentType "application/json" -Body $createBody
-    }
-    catch {
+    } catch {
         throw "GitHub Release creation failed: $($_.Exception.Message)"
     }
 
     Write-Host "  -> Release id: $($release.id)"
     Write-Host "  -> $($release.html_url)"
 
-    Write-Host "Uploading jar asset ..."
-    $uploadUrl   = $release.upload_url -replace '\{\?.*\}', ""
-    $uploadUrl  += "?name=$($jarFile.Name)"
     $assetHeaders = @{
         Authorization = "Bearer $GitHubToken"
         Accept        = "application/vnd.github+json"
         "User-Agent"  = "dovholuknf/openziti-mc publish.ps1"
     }
-    $assetResp = Invoke-RestMethod -Method Post -Uri $uploadUrl `
-        -Headers $assetHeaders -ContentType "application/java-archive" `
-        -InFile $jarPath
-    Write-Host "  -> Asset: $($assetResp.browser_download_url)"
-}
-else {
+    foreach ($t in $targets) {
+        Write-Host "Uploading $($t.jarName) ..."
+        $uploadUrl  = $release.upload_url -replace '\{\?.*\}', ""
+        $uploadUrl += "?name=$($t.jarName)"
+        $assetResp = Invoke-RestMethod -Method Post -Uri $uploadUrl `
+            -Headers $assetHeaders -ContentType "application/java-archive" `
+            -InFile $t.jarPath
+        Write-Host "  -> $($assetResp.browser_download_url)"
+    }
+} else {
     Write-Host "GitHub Release skipped (no token)."
 }
 
