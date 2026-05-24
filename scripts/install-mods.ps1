@@ -255,7 +255,15 @@ if ($toRemove.Count -gt 0) {
 
 Write-Banner "OpenZiti identity"
 
-if (-not $IdentityFile -and -not $NonInteractive) {
+$identityDestDir  = Join-Path $ConfigDir "openziti"
+$identityDestFile = Join-Path $identityDestDir "identity.json"
+
+if (-not $IdentityFile -and (Test-Path -LiteralPath $identityDestFile -PathType Leaf)) {
+    # Already in place from a previous run / manual copy. Don't prompt.
+    $sizeKb = [math]::Round((Get-Item -LiteralPath $identityDestFile).Length / 1KB, 1)
+    Write-Host "Identity already in place at: $identityDestFile ($sizeKb KB)" -ForegroundColor Green
+    Write-Host "To replace it, delete the file first then re-run this script."
+} elseif (-not $IdentityFile -and -not $NonInteractive) {
     $hasIdentity = Read-Host "Do you have an enrolled OpenZiti identity .json file ready? [y/N]"
     if ($hasIdentity -match '^[Yy]') {
         while (-not $IdentityFile) {
@@ -280,17 +288,15 @@ if ($IdentityFile) {
     if (-not (Test-Path -LiteralPath $IdentityFile -PathType Leaf)) {
         Write-Host "  Identity file not found at: $IdentityFile" -ForegroundColor Red
         Write-Host "  Copy it manually to:" -ForegroundColor Yellow
-        Write-Host "    $ConfigDir\openziti\identity.json"
+        Write-Host "    $identityDestFile"
     } else {
-        $destDir  = Join-Path $ConfigDir "openziti"
-        $destFile = Join-Path $destDir "identity.json"
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        Copy-Item -LiteralPath $IdentityFile -Destination $destFile -Force
-        Write-Host "  Identity placed at: $destFile" -ForegroundColor Green
+        New-Item -ItemType Directory -Path $identityDestDir -Force | Out-Null
+        Copy-Item -LiteralPath $IdentityFile -Destination $identityDestFile -Force
+        Write-Host "  Identity placed at: $identityDestFile" -ForegroundColor Green
     }
-} else {
-    Write-Host "  Skipped. When you have one, copy it to:" -ForegroundColor Yellow
-    Write-Host "    $ConfigDir\openziti\identity.json"
+} elseif (-not (Test-Path -LiteralPath $identityDestFile -PathType Leaf)) {
+    Write-Host "  No identity placed. When you have one, copy it to:" -ForegroundColor Yellow
+    Write-Host "    $identityDestFile"
 }
 
 # -- Done --------------------------------------------------------------------
