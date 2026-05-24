@@ -54,7 +54,9 @@ For the full manual install steps, see [INSTALL.md](INSTALL.md).
 ## Set up your own OpenZiti service (hosts)
 
 `setup-ziti.ps1` is the controller-side recipe -- create the service, identities, and
-policies in one interactive script. See [SETUP.md](SETUP.md) for the full walkthrough.
+policies in one interactive script. See [SETUP.md](SETUP.md) for the full walkthrough,
+and [HOSTING.md](HOSTING.md) for the host-machine side (placing the bind identity,
+flipping `serverEnabled`, opening a world to OpenZiti).
 
 ## Loaders and versions
 

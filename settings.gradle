@@ -14,6 +14,25 @@ rootProject.name = "ziti-minecraft"
 // Each include is one MC-version-targeted Fabric jar. The common source lives at
 // /common/src/main/java and is pulled into each mc-* module's main source set, so
 // the same code compiles three times against three different MC mapping JARs.
+include "mc-1.20"
 include "mc-1.20.1"
+include "mc-1.20.2"
+include "mc-1.20.3"
+include "mc-1.20.4"
+include "mc-1.20.5"
+include "mc-1.20.6"
+include "mc-1.21"
 include "mc-1.21.1"
+include "mc-1.21.2"
+include "mc-1.21.3"
 include "mc-1.21.4"
+// 1.21.5+ require Loom 1.10.1+; current toolchain pins Loom 1.7.4.
+// 1.21.9-11 also hit a TagAppender type-variable error in Loom 1.7.4.
+// Module dirs remain on disk for user review.
+//include "mc-1.21.5"
+//include "mc-1.21.6"
+//include "mc-1.21.7"
+//include "mc-1.21.8"
+//include "mc-1.21.9"
+//include "mc-1.21.10"
+//include "mc-1.21.11"

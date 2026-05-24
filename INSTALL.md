@@ -20,6 +20,29 @@ Each release ships three jars, one per MC version:
 
 Pick whichever your friend's server is on. Mismatched MC + jar will refuse to load.
 
+## Multiple Fabric profiles on one machine
+
+If you already have a Fabric profile for a different MC version, or you want both
+1.20.1 and 1.21.4 on the same box, give each profile its own **game directory** so
+the mods don't conflict (the OpenZiti MC jar for 1.20.1 will refuse to load on a
+1.21.4 profile, and vice versa).
+
+1. Run the Fabric installer once per MC version. Leave the installer's **Launcher
+   Location** at the default `%APPDATA%\.minecraft` so it can find
+   `launcher_profiles.json`.
+2. In the Mojang launcher, edit each profile -> **More Options** -> **Game
+   directory** -> point at a per-version path like `%APPDATA%\.minecraft-1.21.4`.
+3. Run the install script below with `-ModsDir` and `-ConfigDir` pointing at the
+   per-version path:
+   ```powershell
+   & $env:TEMP\install-mods.ps1 -MinecraftVersion 1.21.4 `
+       -ModsDir "$env:APPDATA\.minecraft-1.21.4\mods" `
+       -ConfigDir "$env:APPDATA\.minecraft-1.21.4\config"
+   ```
+
+The default (single shared `.minecraft\mods\`) works fine if you only ever run one
+MC version; the per-profile pattern is only needed when you want multiple.
+
 ## Prerequisites
 
 - Minecraft installed via the Mojang launcher (or a launcher-compatible client like

@@ -218,6 +218,30 @@ Friend A's identity needs Bind permission on the service (the `#minecraft-server
 attribute from step 1). Friend B's identity needs Dial permission
 (`#minecraft-clients`). Same controller setup, no dedicated server required.
 
+## Diagnostic: `ziti edge policy-advisor`
+
+Before launching Minecraft, you can verify any identity's Dial/Bind access to a
+service:
+
+```powershell
+ziti edge policy-advisor identities -q <identity-name>
+```
+
+Expected output for a client identity:
+
+```
+OKAY : client-mc (1) -> openziti-mc (1) Common Routers: (1/1) Dial: Y Bind: N
+```
+
+For a server-bind identity it should show `Dial: N Bind: Y`. If `Common Routers: 0/1`
+the identity has no edge router it can reach. If `Dial: N` or `Bind: N` the relevant
+service policy doesn't match the identity's role attributes; fix with `ziti edge update
+identity <name> --role-attributes <attr>`.
+
+This single command catches the most common smoke-test failure -- "the connection
+just doesn't work" almost always traces back to a policy/role mismatch you can spot
+here without ever launching MC.
+
 ## Troubleshooting
 
 | Symptom                                                          | Cause                                                                                                   | Fix                                                                                          |

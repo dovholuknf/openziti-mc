@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": [
+    "${mod_author}"
+  ],
+  "contact": {
+    "homepage": "https://github.com/dovholuknf/openziti-mc",
+    "sources": "https://github.com/dovholuknf/openziti-mc",
+    "issues": "https://github.com/dovholuknf/openziti-mc/issues"
+  },
+  "license": "Apache-2.0",
+  "icon": "assets/openziti/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "org.openziti.minecraft.fabric.ZitiMcFabric"
+    ],
+    "client": [
+      "org.openziti.minecraft.fabric.ZitiMcFabricClient"
+    ],
+    "modmenu": [
+      "org.openziti.minecraft.fabric.ZitiMcModMenu"
+    ]
+  },
+  "mixins": [
+    "${mod_id}.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "fabric-api": "*",
+    "cloth-config": ">=16.0.0",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=${java_version}"
+  },
+  "recommends": {
+    "modmenu": ">=12.0.0"
+  }
+}
